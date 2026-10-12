@@ -66,6 +66,6 @@ CI（`.github/workflows/ci.yml`）在 macOS 上构建应用、跑测试、打包
 
 ## 验证状态
 
-- 核心库与测试已在 Linux 上用 Swift 6.1.3 验证：52 个测试通过，连续 30 次全量运行无失败。
-- SwiftUI 应用目标尚未在 macOS 上编译过（开发环境没有 macOS SDK），只做了语法检查；以 CI 的 macOS 任务结果为准。
-- 尚未连真实服务器联调。
+- 核心库与测试：Linux（Swift 6.1.3）与 macOS 15 / Apple Silicon（GitHub Actions）上 52 个测试全部通过；Linux 上连续 30 次全量运行无失败。
+- SwiftUI 应用：在 macOS CI 上编译、链接并打包为 `Multica.app` 通过。尚未在真机上做交互走查。
+- 尚未连真实服务器联调（接口取自上游源码）。

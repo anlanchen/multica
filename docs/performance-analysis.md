@@ -155,7 +155,9 @@ Markdown 在后台解析为 `AttributedString`，按内容哈希 LRU 缓存；�
 
 运行方式：`swift run -c release multica-bench`。以下数据来自本次开发环境（Linux x86_64，4 核，Swift 6.1.3 release），同一进程、同一份数据，对比"上游策略"与"本客户端策略"。表中是单次运行的结果，重复运行的波动在 ±20% 以内，量级与结论不变。
 
-**注意：** 这是 Swift 实现之间的对比，不是 Swift 与上游 JS 的绝对值对比。比如"全量脱敏"在 Linux 上比上游 V8 报告的 ~25 ms 慢得多，因为 swift-corelibs 的 `NSRegularExpression` 基于 ICU，比 V8 正则慢。应该看的是**扩展性**（随转录长度增长与否）和**发生在哪个线程**。macOS 上的绝对值会不同，CI 的 macOS 任务会把基准结果写进 job summary。
+macOS CI（Apple Silicon，3 核）上同一基准的关键数字：扇出每帧 24.2 µs → 2.2 µs；3000 条时每次 flush 主线程 0.051 ms（上游策略 103 ms / 仅结构 0.52 ms）；时间戳 44.7 µs → 0.07 µs。与 Linux 结论一致。
+
+**注意：** 这是 Swift 实现之间的对比，不是 Swift 与上游 JS 的绝对值对比。比如"全量脱敏"比上游 V8 报告的 ~25 ms 慢得多，因为 Foundation 的 `NSRegularExpression`（ICU）比 V8 正则慢。应该看的是**扩展性**（随转录长度增长与否）和**发生在哪个线程**。CI 的 macOS 任务每次都会把基准结果写进 job summary。
 
 ### 4.1 `task:message` 扇出：10000 帧，20 个并发 run，16.4 MiB，屏上只看 1 个
 
@@ -208,7 +210,7 @@ Markdown 在后台解析为 `AttributedString`，按内容哈希 LRU 缓存；�
 ## 6. 验证情况
 
 - `MulticaCore` + 测试：在 Linux 上用 Swift 6.1.3（Swift 6 语言模式、严格并发检查）构建，**52 个测试全部通过**，全量连续跑 30 次 0 失败。测试覆盖模型容错解码、帧路由（含快路径与完整解码器一致性）、批处理窗口、重连与订阅重放、增量转录（随机化等价性）、脱敏、store 行为、API 单飞与 401 处理，以及用假 HTTP / 假 WebSocket 跑通的端到端会话（启动 → 实时更新 → 打开 issue → 执行日志回填与实时合并 → 发评论）。
-- **SwiftUI/AppKit 应用目标没有在本环境编译**：开发环境是 Linux，没有 macOS SDK。只做了 `swiftc -parse` 语法检查。仓库附带 `.github/workflows/ci.yml`，在 `macos-15` runner 上构建应用目标、跑测试、打包 `.app` 并跑基准；首次在 Mac 上构建时可能需要修正少量 API 细节。
+- **macOS**：`.github/workflows/ci.yml` 在 GitHub Actions `macos-15`（Apple Silicon）上编译并链接 SwiftUI/AppKit 应用目标、打包出 ad-hoc 签名的 `Multica.app`，并跑通同样的 52 个测试和基准，均已通过。尚未在真机上做交互走查（窗口、菜单栏、深链、钥匙串的实际行为）。
 - 没有连真实服务器测试（无账号凭证）。接口与字段取自上游 `a820c9a` 的 Go handler、`packages/core/types` 与 zod schema，解码全部按"缺字段给默认值、未知枚举保留原值"的容错方式实现。
 
 ## 7. 后续建议

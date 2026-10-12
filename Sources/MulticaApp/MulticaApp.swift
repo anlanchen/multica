@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import MulticaCore
 import SwiftUI
 
@@ -69,22 +70,16 @@ struct RootView: View {
                 Task { await env.autoStartIfNeeded() }
             }
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
-                env.setAppActive(true)
-            }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            env.setAppActive(true)
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: NSApplication.didResignActiveNotification) {
-                env.setAppActive(false)
-            }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            env.setAppActive(false)
         }
-        .task {
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)) { _ in
             // A sleeping Mac silently loses its socket; reconnect on wake
             // instead of waiting for the liveness timeout.
-            for await _ in NSWorkspace.shared.notificationCenter.notifications(named: NSWorkspace.didWakeNotification) {
-                await env.app.session?.realtime.reconnectNow()
-            }
+            Task { await env.app.session?.realtime.reconnectNow() }
         }
     }
 }

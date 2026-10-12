@@ -263,10 +263,11 @@ struct BoardColumn: View {
         .background(targeted ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.06),
                     in: RoundedRectangle(cornerRadius: 10))
         .dropDestination(for: String.self) { ids, _ in
+            var request = UpdateIssueRequest()
+            request.status = section.key
+            let move = request
             for id in ids where session.issues.model(id)?.issue.status != section.key {
-                var r = UpdateIssueRequest()
-                r.status = section.key
-                Task { await session.updateIssue(id, r) }
+                Task { await session.updateIssue(id, move) }
             }
             return true
         } isTargeted: { targeted = $0 }
