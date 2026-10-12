@@ -1,3 +1,4 @@
+import AppKit
 import MulticaCore
 import SwiftUI
 
@@ -298,9 +299,15 @@ private struct SkillsRowView: View, Equatable {
                 }
             }
             .frame(minWidth: layout.nameMinWidth, maxWidth: .infinity, alignment: .leading)
+            .skillsOnMiddleClick(openInBackground)
 
             ForEach(layout.columns, id: \.self) { column in
-                cell(column).frame(width: SkillsColumnLayout.width(column), alignment: .leading)
+                if column == .source {
+                    cell(column).frame(width: SkillsColumnLayout.width(column), alignment: .leading)
+                } else {
+                    cell(column).frame(width: SkillsColumnLayout.width(column), alignment: .leading)
+                        .skillsOnMiddleClick(openInBackground)
+                }
             }
 
             Menu {
@@ -322,6 +329,10 @@ private struct SkillsRowView: View, Equatable {
         .onHover { hovering = $0 }
         .onTapGesture { nav.push(.skill(row.id), title: row.skill.name) }
         .contextMenu { SkillsRowMenuItems(row: row, model: model) }
+    }
+
+    private func openInBackground() {
+        nav.openInNewTab(.skill(row.id), title: row.skill.name, activate: false)
     }
 
     @ViewBuilder private func cell(_ column: SkillsColumn) -> some View {
@@ -387,6 +398,7 @@ private struct SkillsSourceCell: View {
             Image(systemName: SkillsOriginStyle.icon(row.origin.type)).font(.system(size: 10))
             if let link = row.origin.linkURL, let url = URL(string: link) {
                 Link(label, destination: url).lineLimit(1).help(link)
+                    .skillsOnMiddleClick { NSWorkspace.shared.open(url) }
             } else {
                 Text(label).lineLimit(1)
             }

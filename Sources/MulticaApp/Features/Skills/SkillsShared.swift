@@ -105,6 +105,42 @@ private struct SkillsRevisionTask: ViewModifier {
     }
 }
 
+extension View {
+    /// Middle-click handler; every other click passes through untouched.
+    func skillsOnMiddleClick(_ action: @escaping () -> Void) -> some View {
+        overlay(SkillsMiddleClickCatcher(action: action))
+    }
+}
+
+private struct SkillsMiddleClickCatcher: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.action = action
+        return view
+    }
+
+    func updateNSView(_ view: CatcherView, context: Context) {
+        view.action = action
+    }
+
+    final class CatcherView: NSView {
+        var action: (() -> Void)?
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            switch NSApp.currentEvent?.type {
+            case .otherMouseDown, .otherMouseUp, .otherMouseDragged: return super.hitTest(point)
+            default: return nil
+            }
+        }
+
+        override func otherMouseUp(with event: NSEvent) {
+            if event.buttonNumber == 2 { action?() } else { super.otherMouseUp(with: event) }
+        }
+    }
+}
+
 enum SkillsLinks {
     static func docsURL() -> URL {
         let lang = L10n.shared.language
