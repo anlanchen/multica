@@ -10,7 +10,7 @@ var products: [Product] = [
 ]
 
 var targets: [Target] = [
-    .target(name: "MulticaCore"),
+    .target(name: "MulticaCore", resources: [.copy("Resources/Locales")]),
     .executableTarget(name: "MulticaBench", dependencies: ["MulticaCore"]),
     .testTarget(name: "MulticaCoreTests", dependencies: ["MulticaCore"]),
 ]

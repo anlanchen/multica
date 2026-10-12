@@ -148,3 +148,28 @@ final class MarkdownCacheTests: XCTestCase {
         XCTAssertNil(cache.cached("Fix **bold** and `code`\nnext line"), "oldest entry is evicted")
     }
 }
+
+final class L10nTests: XCTestCase {
+    func testLooksUpUpstreamCatalogsInEveryLanguage() {
+        let l = L10n()
+        l.setLanguage("en")
+        XCTAssertEqual(l.t("layout", "nav.inbox"), "Inbox")
+        l.setLanguage("zh-CN")
+        XCTAssertEqual(l.language, "zh-Hans")
+        XCTAssertEqual(l.t("layout", "nav.inbox"), "收件箱")
+        l.setLanguage("ja")
+        XCTAssertNotEqual(l.t("layout", "nav.inbox"), "nav.inbox")
+        XCTAssertEqual(l.t("layout", "no.such.key"), "no.such.key")
+    }
+
+    func testPluralsAndInterpolation() {
+        let l = L10n()
+        l.setLanguage("en")
+        let one = l.t("agents", "runtime_filter.agent_count", ["count": 1])
+        let many = l.t("agents", "runtime_filter.agent_count", ["count": 3])
+        XCTAssertTrue(one.contains("1"), one)
+        XCTAssertTrue(many.contains("3"), many)
+        XCTAssertNotEqual(one.replacingOccurrences(of: "1", with: ""), many.replacingOccurrences(of: "3", with: ""))
+        XCTAssertEqual(L10n.pluralSuffix("zh-Hans", 1), "other")
+    }
+}

@@ -16,9 +16,27 @@ extension KeyedDecodingContainer {
         lossy(type, key) ?? value
     }
 
+    /// Lenient scalar/struct decode used by generated models: a missing,
+    /// null or mistyped value yields nil, and numbers convert between Int,
+    /// Double and String the way JavaScript would read them.
+    public func lenient<T: Decodable>(_ type: T.Type, _ key: Key) -> T? {
+        if let v = try? decodeIfPresent(T.self, forKey: key) { return v }
+        if T.self == Int.self, let d = try? decodeIfPresent(Double.self, forKey: key), d.isFinite {
+            return Int(d) as? T
+        }
+        if T.self == String.self {
+            if let i = try? decodeIfPresent(Int.self, forKey: key) { return String(i) as? T }
+            if let b = try? decodeIfPresent(Bool.self, forKey: key) { return String(b) as? T }
+        }
+        if T.self == Bool.self, let s = try? decodeIfPresent(String.self, forKey: key) {
+            return (s == "true") as? T
+        }
+        return nil
+    }
+
     /// Decodes an array, skipping elements that fail to decode instead of
     /// discarding the whole array.
-    func lossyArray<T: Decodable>(_ type: T.Type, _ key: Key) -> [T] {
+    public func lossyArray<T: Decodable>(_ type: T.Type, _ key: Key) -> [T] {
         guard var nested = try? nestedUnkeyedContainer(forKey: key) else { return [] }
         var out: [T] = []
         if let count = nested.count { out.reserveCapacity(count) }

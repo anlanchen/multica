@@ -231,7 +231,7 @@ public struct Issue: Sendable, Hashable, Identifiable, Decodable {
     }
 }
 
-public struct ListIssuesResponse: Sendable, Decodable {
+public struct ListIssuesResponse: Sendable, Hashable, Decodable {
     public var issues: [Issue]
     public var total: Int
 
@@ -283,7 +283,7 @@ public struct IssueStatusEntry: Sendable, Hashable, Identifiable, Decodable {
     }
 }
 
-public struct ListIssueStatusesResponse: Sendable, Decodable {
+public struct ListIssueStatusesResponse: Sendable, Hashable, Decodable {
     public var statuses: [IssueStatusEntry]
 
     enum CodingKeys: String, CodingKey { case statuses }

@@ -24,6 +24,11 @@ fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/MulticaApp" "$APP/Contents/MacOS/Multica"
+# SwiftPM resource bundles (localizations) live in Contents/Resources.
+for b in "$BIN_DIR"/*.bundle; do
+  [ -e "$b" ] && cp -R "$b" "$APP/Contents/Resources/"
+done
+cp LICENSE NOTICE "$APP/Contents/Resources/" 2>/dev/null || true
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

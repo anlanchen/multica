@@ -104,7 +104,8 @@ public actor APIClient {
 
     public enum Method: String, Sendable { case get = "GET", post = "POST", put = "PUT", patch = "PATCH", delete = "DELETE" }
 
-    func makeRequest(_ method: Method, _ path: String, query: [URLQueryItem], body: Data?, slugOverride: String?) -> URLRequest {
+    func makeRequest(_ method: Method, _ path: String, query: [URLQueryItem], body: Data?, slugOverride: String?,
+                     headers: [String: String] = [:]) -> URLRequest {
         var base = config.apiURL.absoluteString
         while base.hasSuffix("/") { base.removeLast() }
         var components = URLComponents(string: base + path)!
@@ -122,16 +123,18 @@ public actor APIClient {
             r.httpBody = body
             r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
+        for (k, v) in headers { r.setValue(v, forHTTPHeaderField: k) }
         return r
     }
 
     /// Sends a request and returns the raw body for a 2xx response.
-    func data(_ method: Method, _ path: String, query: [URLQueryItem] = [], body: Data? = nil, slug: String? = nil) async throws -> Data {
-        let request = makeRequest(method, path, query: query, body: body, slugOverride: slug)
+    func data(_ method: Method, _ path: String, query: [URLQueryItem] = [], body: Data? = nil, slug: String? = nil,
+              headers: [String: String] = [:]) async throws -> Data {
+        let request = makeRequest(method, path, query: query, body: body, slugOverride: slug, headers: headers)
         let credential = token
         // Only reads are safe to share. The key includes the credential and
         // workspace so a switch never receives the previous identity's data.
-        let key = method == .get
+        let key = method == .get && headers.isEmpty
             ? "\(request.url!.absoluteString)|\(credential ?? "")|\(slug ?? workspaceSlug ?? "")"
             : nil
 
@@ -159,6 +162,27 @@ public actor APIClient {
         if let key, inflight[key] == task { inflight[key] = nil }
         if owner { metrics.bytesReceived += response.body.count }
 
+        guard (200..<300).contains(response.status) else {
+            metrics.failures += 1
+            if response.status == 401 { handleUnauthorized(credential) }
+            throw APIError.from(status: response.status, body: response.body)
+        }
+        return response.body
+    }
+
+    /// Sends a prepared request (multipart uploads, binary downloads) through
+    /// the same status and 401 handling as `data(...)`.
+    func rawPerform(_ request: URLRequest) async throws -> Data {
+        let credential = token
+        metrics.requests += 1
+        let response: HTTPResponse
+        do {
+            response = try await transport.perform(request)
+        } catch {
+            metrics.failures += 1
+            throw error
+        }
+        metrics.bytesReceived += response.body.count
         guard (200..<300).contains(response.status) else {
             metrics.failures += 1
             if response.status == 401 { handleUnauthorized(credential) }
