@@ -280,6 +280,39 @@ public struct RuntimesPricer: Sendable {
     }
 }
 
+/// One run's (or several runs') usage collapsed to a single figure.
+public struct RuntimesTaskUsageSummary: Sendable, Hashable {
+    public var tokens = 0
+    public var cost = 0.0
+    public var cacheSavings = 0.0
+    public var input = 0
+    public var output = 0
+    public var cacheRead = 0
+    public var cacheWrite = 0
+    /// Distinct models in first-seen order.
+    public var models: [String] = []
+}
+
+extension RuntimesPricer {
+    /// Per-slice pricing summed (a run that spilled across models is priced
+    /// at each model's rate); nil when there is no usage at all.
+    public func summarizeTaskUsage<T: RuntimesPriceable>(_ usage: [T]?) -> RuntimesTaskUsageSummary? {
+        guard let usage, !usage.isEmpty else { return nil }
+        var s = RuntimesTaskUsageSummary()
+        for slice in usage {
+            s.input += slice.inputTokens
+            s.output += slice.outputTokens
+            s.cacheRead += slice.cacheReadTokens
+            s.cacheWrite += slice.cacheWriteTokens
+            s.cost += estimateCost(slice)
+            s.cacheSavings += estimateCacheSavings(slice)
+            if !slice.model.isEmpty && !s.models.contains(slice.model) { s.models.append(slice.model) }
+        }
+        s.tokens = s.input + s.output + s.cacheRead + s.cacheWrite
+        return s
+    }
+}
+
 /// Number and currency formatting shared by the usage views.
 public enum RuntimesFormat {
     static let tokenUnits: [(divisor: Double, suffix: String)] = [(1, ""), (1e3, "K"), (1e6, "M"), (1e9, "B"), (1e12, "T")]

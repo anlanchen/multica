@@ -231,6 +231,16 @@ final class RuntimesTests: XCTestCase {
         XCTAssertEqual(b.total, p.estimateCost(usage(input: 1_000_000, output: 1_000_000, ticks: 10_000_000_000, uncostedInput: 0)), accuracy: 1e-9)
     }
 
+    func testSummarizeTaskUsage() {
+        let p = RuntimesPricer()
+        XCTAssertNil(p.summarizeTaskUsage([RuntimeUsage]()))
+        XCTAssertNil(p.summarizeTaskUsage(Optional<[RuntimeUsage]>.none))
+        let s = p.summarizeTaskUsage([usage(model: "claude-sonnet-4-5"), usage(model: "claude-opus-4-1"), usage(model: "claude-sonnet-4-5")])
+        XCTAssertEqual(s?.models, ["claude-sonnet-4-5", "claude-opus-4-1"])
+        XCTAssertEqual(s?.tokens, 3_000_000)
+        XCTAssertEqual(s?.cost ?? 0, 21, accuracy: 1e-9)
+    }
+
     func testUnmappedModels() {
         let p = RuntimesPricer()
         let rows = [usage(model: "auto", provider: "x"), usage(model: "mystery", provider: ""), usage(model: "claude-opus-4-7"),

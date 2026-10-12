@@ -287,7 +287,7 @@ private struct RuntimesMikaSetupCard: View {
         let chats = session.chatSessions
         let show = agents.isLoaded && chats.isLoaded && !session.runtimeRecords.items.isEmpty
             && RuntimesKit.memberNeedsMikaSetup(agents: agents.items, sessions: chats.items)
-        Group {
+        VStack(spacing: 0) {
             if show {
                 HStack(spacing: 16) {
                     Text("🦄")
