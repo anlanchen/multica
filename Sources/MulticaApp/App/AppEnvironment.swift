@@ -250,8 +250,16 @@ final class AppEnvironment {
             await app.handleDeepLink(url)
             return
         }
+        if url.host == "invite", let id = url.pathComponents.dropFirst().first {
+            OnboardingLinkRouter.shared.invitationID = id
+            return
+        }
         let path = url.host == "open" ? url.path : "/" + (url.host ?? "") + url.path
         guard let (slug, route) = AppRoute.parse(path: path) else { return }
+        if app.session != nil, !app.workspaces.contains(where: { $0.slug == slug }) {
+            OnboardingLinkRouter.shared.noAccessSlug = slug
+            return
+        }
         if app.session?.workspace.slug != slug, let ws = app.workspaces.first(where: { $0.slug == slug }) {
             await switchWorkspace(ws)
         }
