@@ -69,22 +69,22 @@ final class SquadsTests: XCTestCase {
     }
 
     func testAvatarCropGeometry() {
-        let image = CGSize(width: 1000, height: 500)
-        XCTAssertEqual(SquadsAvatarCrop.rotatedSize(image, quarterTurns: 1), CGSize(width: 500, height: 1000))
+        let image = SquadsCropSize(width: 1000, height: 500)
+        XCTAssertEqual(SquadsAvatarCrop.rotatedSize(image, quarterTurns: 1), SquadsCropSize(width: 500, height: 1000))
         XCTAssertEqual(SquadsAvatarCrop.rotatedSize(image, quarterTurns: 2), image)
         XCTAssertEqual(SquadsAvatarCrop.scale(image: image, viewport: 250, zoom: 1), 0.5)
         XCTAssertEqual(SquadsAvatarCrop.scale(image: image, viewport: 250, zoom: 9), 1.5)
         // Centered at zoom 1 the crop is the centered short-side square.
         XCTAssertEqual(SquadsAvatarCrop.cropRect(image: image, viewport: 250, zoom: 1, offset: .zero),
-                       CGRect(x: 250, y: 0, width: 500, height: 500))
+                       SquadsCropRect(x: 250, y: 0, width: 500, height: 500))
         // Panning right shows the left part; vertical overhang is zero.
-        let clamped = SquadsAvatarCrop.clampOffset(CGSize(width: 1000, height: 40), image: image, viewport: 250, zoom: 1)
-        XCTAssertEqual(clamped, CGSize(width: 125, height: 0))
-        XCTAssertEqual(SquadsAvatarCrop.cropRect(image: image, viewport: 250, zoom: 1, offset: CGSize(width: 1000, height: 0)),
-                       CGRect(x: 0, y: 0, width: 500, height: 500))
+        let clamped = SquadsAvatarCrop.clampOffset(SquadsCropSize(width: 1000, height: 40), image: image, viewport: 250, zoom: 1)
+        XCTAssertEqual(clamped, SquadsCropSize(width: 125, height: 0))
+        XCTAssertEqual(SquadsAvatarCrop.cropRect(image: image, viewport: 250, zoom: 1, offset: SquadsCropSize(width: 1000, height: 0)),
+                       SquadsCropRect(x: 0, y: 0, width: 500, height: 500))
         // Zoom 2 halves the visible side.
         XCTAssertEqual(SquadsAvatarCrop.cropRect(image: image, viewport: 250, zoom: 2, offset: .zero),
-                       CGRect(x: 375, y: 125, width: 250, height: 250))
+                       SquadsCropRect(x: 375, y: 125, width: 250, height: 250))
     }
 
     func testCreateSelection() {

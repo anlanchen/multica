@@ -24,6 +24,8 @@ fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/MulticaApp" "$APP/Contents/MacOS/Multica"
+# Local symbols are most of the binary; keep them only in the build dir.
+strip -x "$APP/Contents/MacOS/Multica"
 # SwiftPM resource bundles (localizations) live in Contents/Resources.
 for b in "$BIN_DIR"/*.bundle; do
   [ -e "$b" ] && cp -R "$b" "$APP/Contents/Resources/"

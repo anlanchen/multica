@@ -118,11 +118,11 @@ struct SquadsAvatarCropSheet: View {
     private let viewport: Double = 320
 
     private var imageSize: CGSize { CGSize(width: image.width, height: image.height) }
-    private var rotated: CGSize { SquadsAvatarCrop.rotatedSize(imageSize, quarterTurns: turns) }
+    private var rotated: CGSize { CGSize(SquadsAvatarCrop.rotatedSize(imageSize.squadsCrop, quarterTurns: turns)) }
 
     var body: some View {
-        let s = SquadsAvatarCrop.scale(image: rotated, viewport: viewport, zoom: zoom)
-        let shown = SquadsAvatarCrop.clampOffset(offset, image: rotated, viewport: viewport, zoom: zoom)
+        let s = SquadsAvatarCrop.scale(image: rotated.squadsCrop, viewport: viewport, zoom: zoom)
+        let shown = CGSize(SquadsAvatarCrop.clampOffset(offset.squadsCrop, image: rotated.squadsCrop, viewport: viewport, zoom: zoom))
         VStack(alignment: .leading, spacing: 14) {
             Text(tr("common", "avatar_crop.title")).font(Theme.Font.title)
             ZStack {
@@ -147,8 +147,8 @@ struct SquadsAvatarCropSheet: View {
                     .onChanged { v in
                         let base = dragStart ?? shown
                         if dragStart == nil { dragStart = shown }
-                        offset = SquadsAvatarCrop.clampOffset(CGSize(width: base.width + v.translation.width, height: base.height + v.translation.height),
-                                                              image: rotated, viewport: viewport, zoom: zoom)
+                        offset = CGSize(SquadsAvatarCrop.clampOffset(SquadsCropSize(width: base.width + v.translation.width, height: base.height + v.translation.height),
+                                                                     image: rotated.squadsCrop, viewport: viewport, zoom: zoom))
                     }
                     .onEnded { _ in dragStart = nil }
             )
@@ -194,7 +194,7 @@ struct SquadsAvatarCropSheet: View {
     }
 
     private func save() async {
-        let crop = SquadsAvatarCrop.cropRect(image: rotated, viewport: viewport, zoom: zoom, offset: offset)
+        let crop = CGRect(SquadsAvatarCrop.cropRect(image: rotated.squadsCrop, viewport: viewport, zoom: zoom, offset: offset.squadsCrop))
         let source = image
         let quarter = turns
         let data = await Task.detached(priority: .userInitiated) { SquadsAvatarRenderer.render(source, quarterTurns: quarter, crop: crop) }.value
@@ -218,7 +218,7 @@ enum SquadsAvatarRenderer {
     /// Rotates, crops and encodes to a square JPEG on a white bed.
     static func render(_ image: CGImage, quarterTurns: Int, crop: CGRect) -> Data? {
         let w = CGFloat(image.width), h = CGFloat(image.height)
-        let rotatedSize = SquadsAvatarCrop.rotatedSize(CGSize(width: w, height: h), quarterTurns: quarterTurns)
+        let rotatedSize = CGSize(SquadsAvatarCrop.rotatedSize(SquadsCropSize(width: w, height: h), quarterTurns: quarterTurns))
         let space = CGColorSpaceCreateDeviceRGB()
         guard let rctx = CGContext(data: nil, width: Int(rotatedSize.width), height: Int(rotatedSize.height), bitsPerComponent: 8,
                                    bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
@@ -356,4 +356,13 @@ struct SquadsLeaderChip: View {
         .padding(.vertical, compact ? 1 : 2)
         .background(RoundedRectangle(cornerRadius: 4).fill(Color(light: 0xFEF3C7, dark: 0x78350F).opacity(0.9)))
     }
+}
+
+private extension CGSize {
+    var squadsCrop: SquadsCropSize { SquadsCropSize(width: width, height: height) }
+    init(_ s: SquadsCropSize) { self.init(width: s.width, height: s.height) }
+}
+
+private extension CGRect {
+    init(_ r: SquadsCropRect) { self.init(x: r.x, y: r.y, width: r.width, height: r.height) }
 }
