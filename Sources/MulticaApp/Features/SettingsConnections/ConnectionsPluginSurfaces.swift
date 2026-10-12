@@ -33,11 +33,12 @@ struct ConnectionsPluginPanelSection: View {
 struct ConnectionsPluginModalMenuItems: View {
     @Environment(WorkspaceSession.self) private var session
     @Environment(AppEnvironment.self) private var env
+    let issueID: String
 
     var body: some View {
         let catalog = ConnectionsPluginCatalog.shared(session)
         let targets = catalog.installations.filter(\.enabled).flatMap { inst in
-            inst.surfaces.filter { $0.type == "modal" }.map { ConnectionsPluginModalTarget(installation: inst, surface: $0) }
+            inst.surfaces.filter { $0.type == "modal" }.map { ConnectionsPluginModalTarget(installation: inst, surface: $0, issueID: issueID) }
         }
         if env.appConfig?.featureFlags?["plugins_v1"] == true {
             ForEach(targets) { target in
@@ -52,7 +53,8 @@ struct ConnectionsPluginModalMenuItems: View {
 struct ConnectionsPluginModalTarget: Identifiable, Equatable {
     var installation: PluginInstallation
     var surface: PluginSurface
-    var id: String { "\(installation.id):\(surface.key)" }
+    var issueID: String?
+    var id: String { "\(installation.id):\(surface.key):\(issueID ?? "")" }
 }
 
 extension View {
@@ -81,7 +83,7 @@ private struct ConnectionsPluginModalHost: ViewModifier {
                         .buttonStyle(.borderless)
                         .keyboardShortcut(.cancelAction)
                 }
-                ConnectionsPluginSurfaceFrame(installation: target.installation, surface: target.surface, issueID: issueID)
+                ConnectionsPluginSurfaceFrame(installation: target.installation, surface: target.surface, issueID: target.issueID ?? issueID)
             }
             .padding(20)
             .frame(width: 640)

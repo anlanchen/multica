@@ -23,6 +23,7 @@ struct IssueDetailSidebar: View {
                     }
                     IssueDetailQuickActions(store: store)
                     IssueDetailWakeupsSection(store: store, issue: issue)
+                    ConnectionsPluginPanelSection(issueID: issue.id)
                     if let parent = store.parentIssue {
                         VStack(alignment: .leading, spacing: 0) {
                             IssueDetailSectionHeader(title: tr("issues", "detail.section_parent_issue"), open: $parentOpen)

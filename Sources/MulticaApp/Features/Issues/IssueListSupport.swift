@@ -73,8 +73,8 @@ enum IssueListPrefs {
     }
 
     /// Settings › Preferences "open issues in": `page` | `peek`.
-    static var openMode: String {
-        defaults.string(forKey: "multica.issueOpenMode") == "peek" ? "peek" : "page"
+    @MainActor static var openMode: String {
+        SettingsDevicePreferences.shared.issueOpenMode.rawValue
     }
 }
 

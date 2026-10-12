@@ -17,7 +17,8 @@ struct InboxDetailPane: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if let item = model.selected {
             if let issueID = item.issueID {
-                IssueDetailPage(issueID: issueID)
+                IssueDetailPage(issueID: issueID, highlightCommentID: item.details["comment_id"],
+                                onDone: { model.archive(item.id) }, onDelete: { model.select("") })
                     .id(issueID)
             } else {
                 ScrollView {

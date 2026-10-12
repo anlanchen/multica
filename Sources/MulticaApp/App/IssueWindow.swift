@@ -38,6 +38,8 @@ struct IssueWindowRoot: View {
                 }
                 .overlay(alignment: .bottomTrailing) { ToastOverlay() }
                 .modifier(ModalHost())
+                .connectionsPluginModalHost(issueID: nil)
+                .connectionsPluginCatalog()
                 .environment(session)
                 .environment(navigator)
             } else if env.app.session == nil {

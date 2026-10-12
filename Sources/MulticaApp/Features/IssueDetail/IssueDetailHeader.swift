@@ -48,6 +48,7 @@ struct IssueDetailHeader: View {
     @Environment(Navigator.self) private var nav
     @Environment(ShellState.self) private var shell
     @Environment(Toaster.self) private var toaster
+    @Environment(\.issueDetailHost) private var host
 
     var body: some View {
         HStack(spacing: 8) {
@@ -55,6 +56,23 @@ struct IssueDetailHeader: View {
             Spacer(minLength: 8)
             IssueDetailAgentChip(store: store)
             IssueDetailWakeupChip(store: store) { shell.rightPanelOpen = true }
+            if let onDone = host.onDone, let issue = store.issue {
+                let category = issue.category(in: session.issues.catalog)
+                if category != .done && category != .closed {
+                    Button {
+                        Task { await store.updateStatus(.done, toaster: toaster) }
+                        onDone()
+                    } label: { Image(systemName: "checkmark.circle") }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .help(tr("issues", "detail.mark_done_tooltip"))
+                } else if category == .done {
+                    Button { onDone() } label: { Image(systemName: "archivebox") }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .help(tr("issues", "detail.archive_tooltip"))
+                }
+            }
             Button { Task { await store.togglePin(toaster: toaster) } } label: {
                 Image(systemName: store.isPinned ? "pin.slash" : "pin")
             }
@@ -192,6 +210,8 @@ struct IssueDetailActionsMenu: View {
             Button { modals.present(.addChildIssue(parentID: issue.id)) } label: { Label(tr("issues", "actions.add_sub_issue"), systemImage: "arrow.down") }
             Button { modals.present(.markDuplicateIssue(issueID: issue.id)) } label: { Label(tr("issues", "actions.mark_duplicate"), systemImage: "equal.circle") }
         } label: { Label(tr("issues", "actions.relations"), systemImage: "point.3.connected.trianglepath.dotted") }
+        ConnectionsPluginHookMenuItems(issueID: issue.id)
+        ConnectionsPluginModalMenuItems(issueID: issue.id)
         Divider()
         Button(role: .destructive) { modals.present(.deleteIssues(issueIDs: [issue.id])) } label: {
             Label(tr("issues", "actions.delete_issue"), systemImage: "trash")

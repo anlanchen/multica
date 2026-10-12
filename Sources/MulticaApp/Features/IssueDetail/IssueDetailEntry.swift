@@ -6,6 +6,12 @@ import SwiftUI
 /// UUID or an identifier (`MUL-123`).
 struct IssueDetailPage: View {
     let issueID: String
+    /// Inbox: scroll to and flash this comment.
+    var highlightCommentID: String? = nil
+    /// Inbox: adds the header's "mark done" / "archive" buttons.
+    var onDone: (() -> Void)? = nil
+    /// Called once when the issue turns out deleted.
+    var onDelete: (() -> Void)? = nil
 
     @Environment(WorkspaceSession.self) private var session
     @State private var store: IssueDetailStore?
@@ -24,6 +30,8 @@ struct IssueDetailPage: View {
         }
         .task(id: issueID) { await open() }
         .onDisappear { store?.close() }
+        .onChange(of: store?.notFound == true || notFound) { _, gone in if gone { onDelete?() } }
+        .environment(\.issueDetailHost, IssueDetailHostOptions(highlightCommentID: highlightCommentID, onDone: onDone))
     }
 
     private func open() async {
@@ -143,6 +151,7 @@ struct IssueDetailScreen: View {
     @State private var dragStart: Double?
     @State private var runConfirm: IssueDetailRunGate?
     @State private var consumedHighlight: String?
+    @Environment(\.issueDetailHost) private var host
 
     var body: some View {
         VStack(spacing: 0) {
@@ -183,7 +192,7 @@ struct IssueDetailScreen: View {
             await store.loadChildren()
         }
         .task(id: store.layout.items.count) {
-            guard let target = nav.query("comment"), consumedHighlight != target,
+            guard let target = host.highlightCommentID ?? nav.query("comment"), consumedHighlight != target,
                   store.layout.items.contains(where: { $0.thread?.root.id == target || store.layout.replyToRoot[target] != nil }) else { return }
             consumedHighlight = target
             store.jump(to: target)
@@ -284,4 +293,22 @@ struct IssueDetailScreen: View {
 struct IssueDetailRunConfirmItem: Identifiable {
     let intent: IssueDetailRunGate
     var id: String { "\(intent)" }
+}
+
+/// What an embedding host adds to the page (upstream IssueDetail's
+/// `highlightCommentId` / `onDone` props, used by the inbox).
+struct IssueDetailHostOptions {
+    var highlightCommentID: String?
+    var onDone: (() -> Void)?
+}
+
+private struct IssueDetailHostKey: EnvironmentKey {
+    static let defaultValue = IssueDetailHostOptions()
+}
+
+extension EnvironmentValues {
+    var issueDetailHost: IssueDetailHostOptions {
+        get { self[IssueDetailHostKey.self] }
+        set { self[IssueDetailHostKey.self] = newValue }
+    }
 }

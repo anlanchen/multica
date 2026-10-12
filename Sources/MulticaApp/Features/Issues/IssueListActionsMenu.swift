@@ -145,6 +145,8 @@ struct IssueListActionsMenu: View {
         } label: {
             Label(tr("issues", "actions.relations"), systemImage: "point.3.connected.trianglepath.dotted")
         }
+        ConnectionsPluginHookMenuItems(issueID: issue.id)
+        ConnectionsPluginModalMenuItems(issueID: issue.id)
         Divider()
         Button(role: .destructive) {
             modals.present(.deleteIssues(issueIDs: [issue.id]))
