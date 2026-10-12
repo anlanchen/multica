@@ -120,6 +120,33 @@ final class WorkspaceSessionTests: XCTestCase {
         await s.stop()
     }
 
+    @MainActor func testCatalogLoadsOnceAndFollowsResourceEvents() async throws {
+        let (s, t, connector) = makeSession()
+        let project = #"{"id":"p1","workspace_id":"ws1","title":"Beta","description":null,"icon":null,"status":"planned","priority":"none","lead_type":null,"lead_id":null,"start_date":null,"due_date":null,"created_at":"2026-09-01T00:00:00Z","updated_at":"2026-09-01T00:00:00Z","issue_count":0,"done_count":0,"resource_count":0}"#
+        t.on("GET", "/api/projects", json: #"{"projects":[\#(project)],"total":1}"#)
+        await s.start()
+        await s.projects.loadIfNeeded()
+        await s.projects.loadIfNeeded()
+        XCTAssertEqual(t.count("GET", "/api/projects"), 1)
+        XCTAssertEqual(s.projects.items.map(\.title), ["Beta"])
+
+        let opened = await eventually { connector.sockets.first?.sent.isEmpty == false }
+        XCTAssertTrue(opened)
+        let socket = connector.sockets[0]
+        socket.push(#"{"type":"auth_ack"}"#)
+        let alpha = project.replacingOccurrences(of: "\"p1\"", with: "\"p2\"").replacingOccurrences(of: "Beta", with: "Alpha")
+        socket.push(#"{"type":"project:created","payload":{"project":\#(alpha)}}"#)
+        let added = await eventually { s.projects.items.map(\.id) == ["p2", "p1"] }
+        XCTAssertTrue(added, "created project is inserted in title order")
+        socket.push(#"{"type":"project:deleted","payload":{"project_id":"p1"}}"#)
+        let removed = await eventually { s.projects.items.map(\.id) == ["p2"] }
+        XCTAssertTrue(removed)
+        socket.push(#"{"type":"pull_request:updated","payload":{"issue_id":"i1"}}"#)
+        let bumped = await eventually { s.revision("pull_request") == 1 }
+        XCTAssertTrue(bumped)
+        await s.stop()
+    }
+
     @MainActor func testFailedCommentStaysVisibleForRetry() async throws {
         let (s, t, _) = makeSession()
         t.on("POST", "/api/issues/i2/comments", status: 500, json: #"{"error":"boom"}"#)

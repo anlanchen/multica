@@ -83,4 +83,8 @@ public enum RealtimeEvent: Sendable {
     case catalogChanged(CatalogKind)
     case workspaceDeleted(workspaceID: String)
     case connection(ConnectionState)
+    /// Any other server event (projects, squads, pins, chat, invitations,
+    /// pull requests, reactions, ...), with its raw payload. Stores answer
+    /// these by patching from the payload or refetching.
+    case resource(type: String, payload: JSONValue)
 }

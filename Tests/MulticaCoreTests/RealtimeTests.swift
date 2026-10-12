@@ -89,7 +89,8 @@ final class FrameRouterTests: XCTestCase {
         guard case .control(.authAck) = router.decode(Data(#"{"type":"auth_ack"}"#.utf8)) else { return XCTFail() }
         guard case .control(.authError(let e)) = router.decode(Data(#"{"error":"invalid token"}"#.utf8)) else { return XCTFail() }
         XCTAssertEqual(e, "invalid token")
-        guard case .ignored = router.decode(Data(#"{"type":"pin:created","payload":{}}"#.utf8)) else { return XCTFail() }
+        guard case .event(.resource(let type, _)) = router.decode(Data(#"{"type":"pin:created","payload":{}}"#.utf8)), type == "pin:created" else { return XCTFail() }
+        guard case .ignored = router.decode(Data(#"{"type":"daemon:heartbeat","payload":{}}"#.utf8)) else { return XCTFail() }
         guard case .ignored = router.decode(Data("not json".utf8)) else { return XCTFail() }
         guard case .ignored = router.decode(Data("[1,2]".utf8)) else { return XCTFail() }
     }

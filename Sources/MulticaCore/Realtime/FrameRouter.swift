@@ -185,10 +185,13 @@ private struct Envelope: Decodable {
             let p = (try? payload(ScopePayload.self))
             result = .control(.subscribeError(scope: p?.scope ?? "", id: p?.id ?? "", error: p?.error ?? ""))
 
-        default:
-            // daemon:heartbeat, task:progress, chat:*, pin:*, ... are not
-            // rendered by this client yet.
+        case "daemon:heartbeat", "task:progress":
+            // High-frequency liveness noise; nothing on screen reads it.
             result = .ignored(type)
+
+        default:
+            let raw = (try? c.decodeIfPresent(JSONValue.self, forKey: .payload)) ?? .null
+            result = .event(.resource(type: type, payload: raw ?? .null))
         }
     }
 }

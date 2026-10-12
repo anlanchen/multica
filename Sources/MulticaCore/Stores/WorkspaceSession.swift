@@ -15,6 +15,25 @@ public final class WorkspaceSession {
     public let inbox = InboxStore()
     public let directory = Directory()
 
+    // Catalogs loaded when a screen first needs them, kept live by realtime.
+    public let projects = CollectionStore<Project>(sort: { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending })
+    public let squads = CollectionStore<Squad>(sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    public let skills = CollectionStore<SkillSummary>(sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    public let autopilots = CollectionStore<Autopilot>(sort: { $0.createdAt > $1.createdAt })
+    public let pins = CollectionStore<PinnedItem>(sort: { $0.position < $1.position })
+    public let labels = CollectionStore<IssueLabel>(sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    public let properties = CollectionStore<IssueProperty>(sort: { $0.position < $1.position })
+    public let quickActions = CollectionStore<QuickAction>(sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    public let chatSessions = CollectionStore<ChatSession>(sort: { $0.updatedAt > $1.updatedAt })
+    public let agentRecords = CollectionStore<AgentRecord>(sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    public let memberRecords = CollectionStore<MemberWithUserRecord>(sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    public let runtimeRecords = CollectionStore<RuntimeDeviceRecord>(sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    public let issueStatusEntries = CollectionStore<IssueStatusEntry>(sort: { $0.position < $1.position })
+
+    /// Bumped by realtime events a specific detail screen should refetch on
+    /// (keyed by resource type, e.g. "pull_request", "subscriber").
+    public private(set) var resourceRevision: [String: Int] = [:]
+
     public private(set) var connection: ConnectionState = .connecting
     public private(set) var lastError: String?
     public private(set) var isBootstrapped = false
@@ -33,7 +52,89 @@ public final class WorkspaceSession {
         self.api = api
         self.realtime = realtime
         issues.currentUserID = user.id
+        configureCatalogs()
     }
+
+    private func configureCatalogs() {
+        let api = self.api
+        let workspaceID = workspace.id
+        projects.configure { try await api.listProjects().projects }
+        squads.configure { try await api.listSquads() }
+        skills.configure { try await api.listSkills() }
+        autopilots.configure { try await api.listAutopilots().autopilots }
+        pins.configure { try await api.listPins() }
+        labels.configure { try await api.listLabels().labels }
+        properties.configure { try await api.listProperties(includeArchived: true).properties }
+        quickActions.configure { try await api.listQuickActions(includeArchived: true).quickActions }
+        chatSessions.configure { try await api.listChatSessions() }
+        agentRecords.configure { try await api.listAgents(includeArchived: true) }
+        memberRecords.configure { try await api.listMembers(workspaceId: workspaceID) }
+        runtimeRecords.configure { try await api.listRuntimes() }
+        issueStatusEntries.configure { try await api.listIssueStatuses(includeArchived: true).statuses }
+    }
+
+    private func bump(_ key: String) {
+        resourceRevision[key, default: 0] += 1
+    }
+
+    public func revision(_ key: String) -> Int {
+        resourceRevision[key] ?? 0
+    }
+
+    private func decode<T: Decodable>(_ type: T.Type, _ value: JSONValue?) -> T? {
+        guard let value, let data = try? JSONCoders.encoder.encode(value) else { return nil }
+        return try? JSONCoders.decoder.decode(T.self, from: data)
+    }
+
+    /// Applies an event the realtime layer passed through untyped.
+    private func applyResource(type: String, payload: JSONValue) {
+        let parts = type.split(separator: ":", maxSplits: 1)
+        let kind = parts.first.map(String.init) ?? type
+        let verb = parts.count > 1 ? String(parts[1]) : ""
+        switch kind {
+        case "project":
+            if verb == "deleted", let id = payload["project_id"]?.stringValue {
+                projects.remove(id)
+            } else if let p = decode(Project.self, payload["project"]) {
+                projects.upsert(p)
+            }
+        case "squad":
+            Task { await squads.refreshIfLoaded() }
+        case "skill":
+            Task { await skills.refreshIfLoaded() }
+        case "label":
+            Task { await labels.refreshIfLoaded() }
+        case "pin":
+            Task { await pins.refreshIfLoaded() }
+        case "property":
+            if let p = decode(IssueProperty.self, payload["property"]) { properties.upsert(p) }
+        case "chat":
+            if verb == "session_deleted", let id = payload["chat_session_id"]?.stringValue {
+                chatSessions.remove(id)
+            } else {
+                Task { await chatSessions.refreshIfLoaded() }
+            }
+            bump("chat")
+        case "invitation":
+            bump("invitation")
+            Task { await memberRecords.refreshIfLoaded() }
+        case "issue_properties", "issue_metadata", "issue_attachments", "issue_reaction", "subscriber", "reaction":
+            if let issueID = payload["issue_id"]?.stringValue, let d = details[issueID] {
+                Task { await self.reload(d) }
+            }
+            bump(kind)
+        case "pull_request", "github_installation":
+            bump(kind)
+        case "issue_status":
+            Task { await issueStatusEntries.refreshIfLoaded() }
+        default:
+            bump(kind)
+        }
+        lastResourceEvent = type
+    }
+
+    /// The type of the latest untyped event (diagnostics).
+    public private(set) var lastResourceEvent: String?
 
     // MARK: Lifecycle
 
@@ -149,12 +250,16 @@ public final class WorkspaceSession {
 
         case .agentUpsert(let a):
             directory.upsertAgent(a)
+            Task { await agentRecords.refreshIfLoaded() }
 
         case .catalogChanged(let kind):
             refreshCatalog(kind)
 
         case .workspaceDeleted:
             lastError = "This workspace was deleted."
+
+        case .resource(let type, let payload):
+            applyResource(type: type, payload: payload)
 
         case .connection(let state):
             connection = state
@@ -191,13 +296,19 @@ public final class WorkspaceSession {
             switch kind {
             case .members:
                 if let m = try? await self.api.members(workspaceID: self.workspace.id) { self.directory.setMembers(m) }
+                await self.memberRecords.refreshIfLoaded()
             case .agents:
                 if let a = try? await self.api.agents() { self.directory.setAgents(a) }
+                await self.agentRecords.refreshIfLoaded()
             case .statuses:
                 if let s = try? await self.api.issueStatuses() { self.issues.setCatalog(s) }
+                await self.issueStatusEntries.refreshIfLoaded()
             case .runtimes:
                 if let r = try? await self.api.runtimes() { self.directory.setRuntimes(r) }
-            case .labels, .workspace:
+                await self.runtimeRecords.refreshIfLoaded()
+            case .labels:
+                await self.labels.refreshIfLoaded()
+            case .workspace:
                 break
             case .other:
                 if let s = try? await self.api.inboxUnreadSummary() { self.inbox.setSummary(s) }
