@@ -173,3 +173,51 @@ final class L10nTests: XCTestCase {
         XCTAssertEqual(L10n.pluralSuffix("zh-Hans", 1), "other")
     }
 }
+
+final class MarkdownBlocksTests: XCTestCase {
+    func testParsesCommonBlocks() {
+        let md = """
+        # Title
+        Some *text*
+        continued.
+
+        - [x] done
+        - [ ] todo
+          more
+        1. one
+        2. two
+
+        ```swift
+        let a = 1
+        ```
+        > quoted
+        > lines
+
+        | a | b |
+        |---|:-:|
+        | 1 | 2 |
+        ---
+        ![shot](https://x/y.png)
+        """
+        let blocks = MarkdownBlocks.parse(md)
+        XCTAssertEqual(blocks.count, 9)
+        XCTAssertEqual(blocks[0], .heading(level: 1, text: "Title"))
+        XCTAssertEqual(blocks[1], .paragraph("Some *text*\ncontinued."))
+        guard case .list(false, _, let items) = blocks[2] else { return XCTFail("\(blocks[2])") }
+        XCTAssertEqual(items.map(\.checked), [true, false])
+        XCTAssertEqual(items[1].text, "todo\nmore")
+        guard case .list(true, 1, let ordered) = blocks[3] else { return XCTFail() }
+        XCTAssertEqual(ordered.map(\.text), ["one", "two"])
+        XCTAssertEqual(blocks[4], .code(language: "swift", code: "let a = 1"))
+        XCTAssertEqual(blocks[5], .quote("quoted\nlines"))
+        XCTAssertEqual(blocks[6], .table(header: ["a", "b"], rows: [["1", "2"]]))
+        XCTAssertEqual(blocks[7], .rule)
+        XCTAssertEqual(blocks[8], .image(alt: "shot", url: "https://x/y.png"))
+    }
+
+    func testMentions() {
+        let m = MarkdownBlocks.mentions(in: "hi [@Ada](mention://member/u1) and [@Bot](mention://agent/a1), see [MUL-1](mention://issue/i1)")
+        XCTAssertEqual(m.map(\.type), ["member", "agent", "issue"])
+        XCTAssertEqual(m.map(\.label), ["Ada", "Bot", "MUL-1"])
+    }
+}

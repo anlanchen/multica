@@ -109,6 +109,9 @@ public final class IssueStore {
     public func model(_ id: String) -> IssueModel? { models[id] }
     public var count: Int { models.count }
 
+    /// Every loaded issue model, unordered (pickers, search, mentions).
+    public var allModels: [IssueModel] { Array(models.values) }
+
     public func model(identifier: String) -> IssueModel? {
         models.values.first { $0.issue.identifier.caseInsensitiveCompare(identifier) == .orderedSame }
     }

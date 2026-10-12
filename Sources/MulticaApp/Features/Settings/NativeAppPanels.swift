@@ -1,18 +1,7 @@
 import MulticaCore
 import SwiftUI
 
-struct SettingsView: View {
-    var body: some View {
-        TabView {
-            ServerSettings()
-                .tabItem { SwiftUI.Label("Server", systemImage: "network") }
-            DiagnosticsView()
-                .tabItem { SwiftUI.Label("Diagnostics", systemImage: "gauge.with.dots.needle.33percent") }
-        }
-        .frame(width: 520, height: 360)
-    }
-}
-
+/// Native-only panels (server endpoint, diagnostics) shown in Settings.
 struct ServerSettings: View {
     @Environment(AppEnvironment.self) private var env
     @State private var apiURL = ""

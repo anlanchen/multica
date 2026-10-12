@@ -136,6 +136,32 @@ public final class AppModel {
         await s.start()
     }
 
+    /// Refetches the workspace list (after create/rename/delete/leave or an
+    /// accepted invitation). Leaves the current workspace if it is gone.
+    public func reloadWorkspaces(select slug: String? = nil) async {
+        guard let list = try? await api.workspaces() else { return }
+        workspaces = list
+        if let slug, let ws = list.first(where: { $0.slug == slug }) {
+            await select(ws)
+        } else if let current = session?.workspace, !list.contains(where: { $0.id == current.id }) {
+            await session?.stop()
+            session = nil
+            if let first = list.first { await select(first) }
+        } else if session == nil, let first = list.first {
+            await select(first)
+        }
+    }
+
+    /// Replaces the signed-in user after a profile edit.
+    public func setUser(_ updated: User) {
+        user = updated
+    }
+
+    /// Updates a workspace in the list after a settings change.
+    public func replaceWorkspace(_ ws: Workspace) {
+        if let i = workspaces.firstIndex(where: { $0.id == ws.id }) { workspaces[i] = ws }
+    }
+
     public func signOut(serverRejected: Bool = false) async {
         if let s = session { await s.stop() }
         session = nil

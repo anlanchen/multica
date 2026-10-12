@@ -253,9 +253,12 @@ public struct IssueStatusEntry: Sendable, Hashable, Identifiable, Decodable {
     public var position: Double
     public var isSystem: Bool
     public var archivedAt: String?
+    /// Custom geometry (dotted, circle, half, three_quarters, check, slash, cross).
+    public var icon: String?
+    public var description: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, key, name, category, color, position
+        case id, key, name, category, color, position, icon, description
         case isSystem = "is_system"
         case archivedAt = "archived_at"
     }
@@ -280,6 +283,8 @@ public struct IssueStatusEntry: Sendable, Hashable, Identifiable, Decodable {
         position = c.lossy(Double.self, .position, default: 0)
         isSystem = c.lossy(Bool.self, .isSystem, default: false)
         archivedAt = c.lossy(String.self, .archivedAt)
+        icon = c.lossy(String.self, .icon)
+        description = c.lossy(String.self, .description)
     }
 }
 
