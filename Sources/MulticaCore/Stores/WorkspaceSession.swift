@@ -103,6 +103,7 @@ public final class WorkspaceSession {
             Task { await squads.refreshIfLoaded() }
         case "skill":
             Task { await skills.refreshIfLoaded() }
+            bump(kind)
         case "label":
             Task { await labels.refreshIfLoaded() }
         case "pin":
@@ -312,7 +313,9 @@ public final class WorkspaceSession {
                 if let r = try? await self.api.runtimes() { self.directory.setRuntimes(r) }
                 await self.runtimeRecords.refreshIfLoaded()
             case .labels:
+                self.bump("label")
                 await self.labels.refreshIfLoaded()
+                await self.skills.refreshIfLoaded()
             case .workspace:
                 break
             case .other:
