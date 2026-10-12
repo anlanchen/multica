@@ -13,6 +13,13 @@ public enum MarkdownBlock: Hashable, Sendable {
     case table(header: [String], rows: [[String]])
     case rule
     case image(alt: String, url: String)
+    /// `!file[name](url)` on its own line (upstream file-card syntax).
+    case fileCard(name: String, url: String)
+    /// `$$ … $$` display math.
+    case math(String)
+    /// A closed ```mermaid / ```html fence (upstream upgrades only closed
+    /// fences, so a half-streamed diagram stays readable source).
+    case richFence(kind: String, code: String, title: String?)
 }
 
 public struct MarkdownListItem: Hashable, Sendable {
@@ -25,11 +32,21 @@ public struct MarkdownListItem: Hashable, Sendable {
 public enum MarkdownBlocks {
     private static let cache = Locked<[Int: [MarkdownBlock]]>([:])
 
-    /// Memoised parse (documents are re-rendered far more often than edited).
+    /// Host of the deployment's file CDN (`AppConfig.cdn_domain`); lines of
+    /// the legacy form `[name](https://cdn/…)` pointing there render as file
+    /// cards.
+    public static var cdnDomain: String {
+        get { cdn.current }
+        set { cdn.withLock { $0 = newValue } }
+    }
+    private static let cdn = Locked("")
+
+    /// Memoised preprocess + parse (documents are re-rendered far more often
+    /// than edited).
     public static func cachedParse(_ source: String) -> [MarkdownBlock] {
         let key = source.hashValue
         if let hit = cache.current[key] { return hit }
-        let blocks = parse(source)
+        let blocks = parse(MarkdownPreprocess.apply(source))
         cache.withLock { c in
             if c.count > 1500 { c.removeAll(keepingCapacity: true) }
             c[key] = blocks
@@ -59,14 +76,20 @@ public enum MarkdownBlocks {
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
                 flushParagraph()
                 let fence = String(trimmed.prefix(3))
-                let lang = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
+                let info = fenceInfo(String(trimmed.dropFirst(3)))
                 var code: [String] = []
                 i += 1
                 while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).hasPrefix(fence) {
                     code.append(lines[i])
                     i += 1
                 }
-                blocks.append(.code(language: lang.isEmpty ? nil : lang, code: code.joined(separator: "\n")))
+                let closed = i < lines.count
+                let body = code.joined(separator: "\n")
+                if closed, let lang = info.language?.lowercased(), lang == "mermaid" || lang == "html" {
+                    blocks.append(.richFence(kind: lang, code: body, title: info.title))
+                } else {
+                    blocks.append(.code(language: info.language, code: body))
+                }
                 i += 1
                 continue
             }
@@ -75,6 +98,29 @@ public enum MarkdownBlocks {
                 flushParagraph()
                 i += 1
                 continue
+            }
+
+            if let card = fileCard(trimmed) {
+                flushParagraph()
+                blocks.append(card)
+                i += 1
+                continue
+            }
+
+            // Display math.
+            if trimmed.hasPrefix("$$") {
+                if trimmed.count > 4, trimmed.hasSuffix("$$") {
+                    flushParagraph()
+                    blocks.append(.math(String(trimmed.dropFirst(2).dropLast(2)).trimmingCharacters(in: .whitespaces)))
+                    i += 1
+                    continue
+                }
+                if trimmed == "$$", let end = lines[(i + 1)...].firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "$$" }) {
+                    flushParagraph()
+                    blocks.append(.math(lines[(i + 1)..<end].joined(separator: "\n")))
+                    i = end + 1
+                    continue
+                }
             }
 
             // Heading.
@@ -203,6 +249,89 @@ public enum MarkdownBlocks {
             }
         }
         return nil
+    }
+
+    /// Fence info string: language is the first token, `title="…"` optional.
+    static func fenceInfo(_ raw: String) -> (language: String?, title: String?) {
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        let lang = t.prefix { !$0.isWhitespace && $0 != "{" }
+        var title: String?
+        if let r = t.range(of: "title=\"") {
+            let rest = t[r.upperBound...]
+            if let close = rest.firstIndex(of: "\"") { title = String(rest[..<close]) }
+        }
+        return (lang.isEmpty ? nil : String(lang), title)
+    }
+
+    /// `!file[name](url)`, or the legacy `[name](https://<cdn>/…)` line for a
+    /// non-image file on the configured CDN.
+    static func fileCard(_ line: String) -> MarkdownBlock? {
+        if line.hasPrefix("!file["), line.hasSuffix(")"), let close = labelEnd(line, from: line.index(line.startIndex, offsetBy: 5)) {
+            let after = line.index(after: close)
+            guard after < line.endIndex, line[after] == "(" else { return nil }
+            let url = String(line[line.index(after: after)..<line.index(before: line.endIndex)])
+            guard isFileCardURL(url) else { return nil }
+            let rawName = String(line[line.index(line.startIndex, offsetBy: 6)..<close])
+            return .fileCard(name: unescapeLabel(rawName), url: url)
+        }
+        let cdn = cdnDomain
+        if !cdn.isEmpty, line.hasPrefix("["), line.hasSuffix(")"), !line.contains("\n"),
+           let mid = line.range(of: "]("), !line[..<mid.lowerBound].dropFirst().contains("]") {
+            let url = String(line[mid.upperBound..<line.index(before: line.endIndex)])
+            guard url.hasPrefix("http"), let host = URL(string: url)?.host,
+                  host == cdn || host.hasSuffix(".amazonaws.com") else { return nil }
+            let ext = (URL(string: url)?.pathExtension ?? "").lowercased()
+            guard !["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tif", "tiff"].contains(ext) else { return nil }
+            return .fileCard(name: String(line[line.index(after: line.startIndex)..<mid.lowerBound]), url: url)
+        }
+        return nil
+    }
+
+    /// Upstream `FILE_CARD_URL_PATTERN` / `isAllowedFileCardHref`.
+    public static func isFileCardURL(_ url: String) -> Bool {
+        if url.hasPrefix("/uploads/") || url.hasPrefix("http://") || url.hasPrefix("https://") { return !url.contains(")") }
+        return attachmentID(fromDownloadURL: url) != nil
+    }
+
+    /// The attachment id of a stable `/api/attachments/<uuid>/download` URL
+    /// (relative or absolute).
+    public static func attachmentID(fromDownloadURL url: String) -> String? {
+        guard let r = url.range(of: "/api/attachments/") else { return nil }
+        let rest = url[r.upperBound...]
+        guard let slash = rest.firstIndex(of: "/"), rest[slash...].hasPrefix("/download") else { return nil }
+        let id = String(rest[..<slash])
+        guard id.count == 36, UUID(uuidString: id) != nil else { return nil }
+        let tail = rest[slash...].dropFirst("/download".count)
+        return tail.isEmpty || tail.first == "?" ? id : nil
+    }
+
+    private static func labelEnd(_ s: String, from open: String.Index) -> String.Index? {
+        var i = s.index(after: open)
+        var escaped = false
+        while i < s.endIndex {
+            let c = s[i]
+            if escaped { escaped = false } else if c == "\\" { escaped = true } else if c == "]" { return i }
+            i = s.index(after: i)
+        }
+        return nil
+    }
+
+    private static func unescapeLabel(_ s: String) -> String {
+        var out = ""
+        var escaped = false
+        for c in s {
+            if escaped {
+                if !"[]\\()".contains(c) { out.append("\\") }
+                out.append(c)
+                escaped = false
+            } else if c == "\\" {
+                escaped = true
+            } else {
+                out.append(c)
+            }
+        }
+        if escaped { out.append("\\") }
+        return out
     }
 
     private static func standaloneImage(_ text: String) -> MarkdownBlock? {

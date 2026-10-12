@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body { font: 14px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  #out { display: inline-block; padding: 4px; }
+  #out svg { display: block; height: auto; }
+  math { font-size: 1.2em; }
+</style>
+<script src="katex.min.js"></script>
+<script src="mermaid.min.js"></script>
+<script>
+  let seq = 0;
+  async function renderBlock(kind, source, colors, maxWidth) {
+    const out = document.getElementById("out");
+    out.innerHTML = "";
+    out.style.maxWidth = maxWidth + "px";
+    out.style.color = colors.foreground;
+    document.documentElement.style.colorScheme = colors.scheme;
+    if (kind === "math") {
+      out.innerHTML = katex.renderToString(source, { displayMode: true, output: "mathml", throwOnError: true });
+    } else {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: "base",
+        htmlLabels: false,
+        suppressErrorRendering: true,
+        themeVariables: {
+          primaryColor: colors.muted,
+          primaryBorderColor: colors.primary,
+          primaryTextColor: colors.foreground,
+          lineColor: colors.mutedForeground,
+          fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+        },
+      });
+      const { svg } = await mermaid.render("mmd" + (seq++), source);
+      out.innerHTML = svg;
+      const el = out.querySelector("svg");
+      if (el) { el.style.maxWidth = maxWidth + "px"; }
+    }
+    await document.fonts.ready;
+    const r = out.getBoundingClientRect();
+    return { width: Math.ceil(r.width), height: Math.ceil(r.height) };
+  }
+</script>
+</head>
+<body><div id="out"></div></body>
+</html>

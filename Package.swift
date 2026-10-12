@@ -21,6 +21,7 @@ targets.append(
     .executableTarget(
         name: "MulticaApp",
         dependencies: ["MulticaCore"],
+        resources: [.copy("Resources/Web")],
         swiftSettings: [.swiftLanguageMode(.v5)]
     )
 )

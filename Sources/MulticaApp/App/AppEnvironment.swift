@@ -97,6 +97,8 @@ final class AppEnvironment {
         tabs = tabStore
         navigator = Navigator(tabs: tabStore, slug: "")
         ImageLoader.baseURL = config.apiURL
+        ImageLoader.api = app.api
+        MarkdownLinks.appURL = config.appURL
         L10n.shared.setLanguage(UserDefaults.standard.string(forKey: Keys.language))
         if let saved = UserDefaults.standard.data(forKey: Keys.tabs) {
             tabs.restore(saved)
@@ -129,6 +131,7 @@ final class AppEnvironment {
         let config = Task { try? await api.getConfig() }
         let invitations = Task { try? await api.listMyInvitations() }
         appConfig = await config.value
+        if let cdn = appConfig?.cdnDomain, !cdn.isEmpty { MarkdownBlocks.cdnDomain = cdn }
         myInvitations = await invitations.value ?? []
     }
 

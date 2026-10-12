@@ -9,6 +9,9 @@ final class ImageLoader {
     static let shared = ImageLoader()
     /// API origin used to resolve server-relative paths (`/uploads/...`).
     static var baseURL: URL?
+    /// Signs requests to the API origin; `/api/attachments/<id>/download`
+    /// (the stable URL persisted in Markdown) requires the bearer token.
+    static var api: APIClient?
 
     private let cache = NSCache<NSURL, NSImage>()
     private var inflight: [URL: Task<NSImage?, Never>] = [:]
@@ -34,14 +37,30 @@ final class ImageLoader {
         cache.object(forKey: url as NSURL)
     }
 
+    /// Raw bytes for a (possibly server-relative) URL, with credentials when
+    /// it points at the API origin.
+    func data(_ raw: String) async throws -> Data {
+        guard let url = Self.resolve(raw) else { throw URLError(.badURL) }
+        return try await data(url)
+    }
+
+    func data(_ url: URL) async throws -> Data {
+        if let api = Self.api, let base = Self.baseURL, url.host == base.host, url.scheme == base.scheme {
+            var path = url.path
+            if let q = url.query { path += "?" + q }
+            return try await api.download(path)
+        }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw URLError(.badServerResponse) }
+        return data
+    }
+
     func load(_ url: URL) async -> NSImage? {
         if let hit = cached(url) { return hit }
         if let task = inflight[url] { return await task.value }
         let task = Task<NSImage?, Never> {
-            guard let (data, response) = try? await URLSession.shared.data(from: url),
-                  (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
-                  let image = NSImage(data: data) else { return nil }
-            return image
+            guard let data = try? await self.data(url) else { return nil }
+            return await Task.detached(priority: .userInitiated) { NSImage(data: data) }.value
         }
         inflight[url] = task
         let image = await task.value
