@@ -45,12 +45,17 @@ public struct APIError: Error, Sendable, Equatable, CustomStringConvertible {
     public var message: String
     /// Structured error body (`{ "error", "code", ... }`) when the server sent one.
     public var body: JSONValue?
-    public var code: String? { body?["code"]?.stringValue }
+    /// The body's machine-readable `code` (e.g. "invalid_timezone").
+    public var code: String?
+    /// The body's `reason_code` (dispatch admission failures).
+    public var reasonCode: String?
 
-    public init(status: Int, message: String, body: JSONValue? = nil) {
+    public init(status: Int, message: String, body: JSONValue? = nil, code: String? = nil, reasonCode: String? = nil) {
         self.status = status
         self.message = message
         self.body = body
+        self.code = code ?? body?["code"]?.stringValue
+        self.reasonCode = reasonCode ?? body?["reason_code"]?.stringValue
     }
 
     public var isUnauthorized: Bool { status == 401 }
