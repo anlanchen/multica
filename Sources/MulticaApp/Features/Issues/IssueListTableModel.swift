@@ -94,10 +94,12 @@ final class IssueListTableModel {
                 groupsError = true
             }
             groupsLoading = false
+            // Group branches activate as their rows scroll into view; a fresh
+            // window only primes the first few.
             let collapsed = Set(surface.state.tableCollapsedGroups)
             let keys = groups.filter { !collapsed.contains($0.key) }.map { Self.branchKey($0.key, nil) }
-            let active = keys.filter { reset ? true : branches[$0]?.activated == true }
-            await fetchHeads(active.isEmpty ? Array(keys.prefix(1)) : active, spec: spec, generation: gen)
+            let active = reset ? Array(keys.prefix(3)) : keys.filter { branches[$0]?.activated == true }
+            await fetchHeads(active, spec: spec, generation: gen)
         } else {
             let key = Self.branchKey(nil, nil)
             var keys = [key]

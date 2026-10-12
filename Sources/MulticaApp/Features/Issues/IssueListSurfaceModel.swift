@@ -96,6 +96,7 @@ final class IssueListSurfaceModel {
     func markSelfInduced() { selfInducedRevision = session.issues.changeRevision }
     @ObservationIgnored private var extras: [String: IssueListRowExtras] = [:]
     @ObservationIgnored private var fingerprint = ""
+    @ObservationIgnored private var lastShape = ""
     @ObservationIgnored private var membership = ""
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var workingIssueIDs: [String]?
@@ -224,7 +225,13 @@ final class IssueListSurfaceModel {
         id.flatMap { projectsByID[$0] }
     }
 
+    /// Read-only for views: branches for every column exist once the
+    /// columns are computed, so `body` never mutates observed state.
     func statusBranch(_ key: IssueStatusKey) -> IssueListBranch {
+        statusBranches[key] ?? IssueListBranch(key: key.rawValue)
+    }
+
+    private func ensureBranch(_ key: IssueStatusKey) -> IssueListBranch {
         if let b = statusBranches[key] { return b }
         let b = IssueListBranch(key: key.rawValue)
         statusBranches[key] = b
@@ -273,6 +280,7 @@ final class IssueListSurfaceModel {
         guard !started else { return }
         started = true
         observeSources()
+        observeActivity()
         activity.refreshSnapshot(session.api)
         activity.startPolling(session.api)
         async let statuses: Void = session.issueStatusEntries.loadIfNeeded()
@@ -316,6 +324,9 @@ final class IssueListSurfaceModel {
         let entries = session.issueListStatusEntries
         let visible = IssueListStatusColumns.visible(statusFilters: state.statusFilters, hidden: state.hiddenStatuses, entries: entries)
         let hidden = IssueListStatusColumns.hidden(statusFilters: state.statusFilters, hidden: state.hiddenStatuses, entries: entries)
+        for key in visible + hidden where statusBranches[key] == nil {
+            statusBranches[key] = IssueListBranch(key: key.rawValue)
+        }
         if visible != visibleStatuses { visibleStatuses = visible }
         if hidden != hiddenStatuses { hiddenStatuses = hidden }
         let custom = state.statusFilters.contains { IssueStatusKey(rawValue: $0).builtInCategory == nil }
@@ -335,6 +346,9 @@ final class IssueListSurfaceModel {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in self?.sourcesChanged() }
         }
+    }
+
+    private func observeActivity() {
         withObservationTracking {
             _ = session.issues.activityRevision
         } onChange: { [weak self] in
@@ -361,11 +375,7 @@ final class IssueListSurfaceModel {
 
     private func activityChanged() {
         guard started else { return }
-        withObservationTracking {
-            _ = session.issues.activityRevision
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in self?.activityChanged() }
-        }
+        observeActivity()
         activityTask?.cancel()
         activityTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(800))
@@ -498,6 +508,19 @@ final class IssueListSurfaceModel {
             fingerprint = fp
             generation += 1
         }
+        // A new group shape is a cold window (skeleton); filter/sort changes
+        // within one shape keep the previous rows on screen while refetching.
+        let shape = usesStatusSurface ? "status" : "\(viewMode.rawValue)|\(effectiveGrouping)|\(state.swimlaneGrouping.rawValue)"
+        if shape != lastShape {
+            lastShape = shape
+            if usesGroupSurface {
+                isLoading = true
+                groupDescriptors = []
+                groupBranches = [:]
+                groupColumns = []
+                lanes = []
+            }
+        }
         let gen = generation
         isRefreshing = !isLoading
         if usesStatusSurface {
@@ -553,7 +576,7 @@ final class IssueListSurfaceModel {
         async let facetResult = try? api.listIssueTableFacets(facetRequest)
         let group: JSONValue = ["kind": "status"]
         for s in statuses {
-            let b = statusBranch(s)
+            let b = ensureBranch(s)
             if reset || !b.loaded { b.isLoading = true }
             b.activated = true
         }
@@ -581,7 +604,7 @@ final class IssueListSurfaceModel {
             if activeFacet != nil { submenuFacets = counts }
         }
         for (s, result) in results {
-            let b = statusBranch(s)
+            let b = ensureBranch(s)
             b.isLoading = false
             switch result {
             case .success(let page):
@@ -604,7 +627,7 @@ final class IssueListSurfaceModel {
     }
 
     func loadMore(status: IssueStatusKey) {
-        let b = statusBranch(status)
+        let b = ensureBranch(status)
         guard let cursor = b.nextCursor, !b.isLoadingMore else { return }
         b.isLoadingMore = true
         let spec = querySpec
@@ -627,7 +650,7 @@ final class IssueListSurfaceModel {
     }
 
     func retry(status: IssueStatusKey) {
-        statusBranch(status).isError = false
+        ensureBranch(status).isError = false
         Task { await reload() }
     }
 
@@ -1210,7 +1233,7 @@ final class IssueListSurfaceModel {
         for (k, b) in statusBranches where k != key {
             if b.rawIDs.contains(id) { b.rawIDs.removeAll { $0 == id } }
         }
-        statusBranch(key).rawIDs = order
+        ensureBranch(key).rawIDs = order
         refilterBranches()
     }
 

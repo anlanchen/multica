@@ -223,7 +223,10 @@ struct IssueListViewBar: View {
                 views: views, items: arranged.ordered, hidden: arranged.hidden, anchorID: anchorID,
                 onReorder: { ids in views.savePrefs(hidden: Array(arranged.hidden), order: ids, known: Set(items.map(\.id))) },
                 onToggleHidden: { id, hidden in toggleHidden(id, hidden: hidden, arranged: arranged) },
-                onEdit: { v in manageOpen = false; onEditView(v) },
+                onEdit: { v in
+                    manageOpen = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { onEditView(v) }
+                },
                 onDelete: { v in try await confirmDelete(v) }
             )
         }
