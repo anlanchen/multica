@@ -43,19 +43,23 @@ public struct URLSessionTransport: HTTPTransport {
 public struct APIError: Error, Sendable, Equatable, CustomStringConvertible {
     public var status: Int
     public var message: String
+    /// Structured error body (`{ "error", "code", ... }`) when the server sent one.
+    public var body: JSONValue?
+    public var code: String? { body?["code"]?.stringValue }
 
-    public init(status: Int, message: String) {
+    public init(status: Int, message: String, body: JSONValue? = nil) {
         self.status = status
         self.message = message
+        self.body = body
     }
 
     public var isUnauthorized: Bool { status == 401 }
     public var description: String { "HTTP \(status): \(message)" }
 
     static func from(status: Int, body: Data) -> APIError {
-        struct ErrorBody: Decodable { var error: String? }
-        let message = (try? JSONCoders.decoder.decode(ErrorBody.self, from: body))?.error
-        return APIError(status: status, message: message ?? "Request failed with status \(status)")
+        let json = try? JSONCoders.decoder.decode(JSONValue.self, from: body)
+        let message = json?["error"]?.stringValue
+        return APIError(status: status, message: message ?? "Request failed with status \(status)", body: json)
     }
 }
 
