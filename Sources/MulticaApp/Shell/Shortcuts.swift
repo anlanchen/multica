@@ -169,7 +169,8 @@ final class KeyMonitor {
     func start() {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, !KeyMonitor.suspended, let chord = ShortcutChord(event: event), let store = self.store else { return event }
+            guard let self, !KeyMonitor.suspended, !KeyMonitor.isAuxiliaryWindow(event.window),
+                  let chord = ShortcutChord(event: event), let store = self.store else { return event }
             guard let action = ShortcutAction.allCases.first(where: { store.chord(for: $0) == chord }) else { return event }
             if action == .send { return event }
             if !action.allowInEditable && KeyMonitor.isEditing(event.window) { return event }
@@ -180,6 +181,27 @@ final class KeyMonitor {
     func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if let swipeMonitor { NSEvent.removeMonitor(swipeMonitor) }
+        swipeMonitor = nil
+    }
+
+    private var swipeMonitor: Any?
+
+    /// Trackpad swipes navigate tab history like the desktop app
+    /// (navigation-gestures.ts: swipe right → back, left → forward).
+    func startSwipes() {
+        guard swipeMonitor == nil else { return }
+        swipeMonitor = NSEvent.addLocalMonitorForEvents(matching: .swipe) { [weak self] event in
+            guard !KeyMonitor.isAuxiliaryWindow(event.window) else { return event }
+            if event.deltaX < 0 { _ = self?.perform?(.goBack) } else if event.deltaX > 0 { _ = self?.perform?(.goForward) }
+            return event
+        }
+    }
+
+    /// Standalone issue windows navigate on their own; global shortcuts
+    /// belong to the main window.
+    static func isAuxiliaryWindow(_ window: NSWindow?) -> Bool {
+        window?.identifier?.rawValue.hasPrefix("issue") == true
     }
 
     static func isEditing(_ window: NSWindow?) -> Bool {

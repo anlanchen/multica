@@ -75,6 +75,7 @@ private struct TabDropDelegate: DropDelegate {
 private struct TabItem: View {
     @Environment(Navigator.self) private var nav
     @Environment(WorkspaceSession.self) private var session
+    @Environment(\.openWindow) private var openWindow
     let tab: TabSession
     let active: Bool
     @State private var hovering = false
@@ -111,6 +112,11 @@ private struct TabItem: View {
         .contextMenu {
             Button(tab.pinned ? "Unpin tab" : "Pin tab") { store.togglePin(tab.id) }
             Button("Duplicate tab") { store.addTab(tab.location, title: tab.title) }
+            if case .issue(let id) = tab.route {
+                Button("Open in new window") {
+                    openWindow(id: "issue", value: IssueWindowTarget(slug: nav.slug, issueID: id))
+                }
+            }
             Divider()
             Button("Close tab") { store.closeTab(tab.id) }.disabled(tab.pinned)
             Button("Close other tabs") { store.closeOtherTabs(tab.id) }

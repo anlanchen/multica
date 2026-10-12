@@ -231,6 +231,7 @@ final class AppEnvironment {
         keyMonitor.store = shortcuts
         keyMonitor.perform = { [weak self] action in self?.perform(action) ?? false }
         keyMonitor.start()
+        keyMonitor.startSwipes()
         notifications.onOpen = { [weak self] slug, itemID, issueKey in
             Task { await self?.openInboxItem(slug: slug, itemID: itemID, issueKey: issueKey) }
         }

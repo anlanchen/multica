@@ -17,6 +17,14 @@ struct MulticaApp: App {
         .windowToolbarStyle(.unifiedCompact)
         .commands { AppCommands(env: env) }
 
+        WindowGroup("Issue", id: "issue", for: IssueWindowTarget.self) { $target in
+            if let target {
+                IssueWindowRoot(target: target)
+                    .environment(env)
+            }
+        }
+        .defaultSize(width: 980, height: 760)
+
         MenuBarExtra {
             MenuBarContent()
                 .environment(env)
