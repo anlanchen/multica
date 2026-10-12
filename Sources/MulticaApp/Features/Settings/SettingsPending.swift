@@ -1,7 +1,5 @@
 import SwiftUI
 
-struct SettingsWorkspaceTab: View { var body: some View { EmptyView() } }
-struct SettingsMembersTab: View { var body: some View { EmptyView() } }
 struct SettingsIssueStatusesTab: View { var body: some View { EmptyView() } }
 struct SettingsWakeupsTab: View { var body: some View { EmptyView() } }
 struct SettingsLabelsTab: View { var body: some View { EmptyView() } }
