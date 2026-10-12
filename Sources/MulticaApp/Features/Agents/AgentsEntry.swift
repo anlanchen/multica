@@ -1,12 +1,12 @@
 import MulticaCore
 import SwiftUI
 
-// Placeholder entry points for this area; replaced by the full screens.
+// Route entry points (called by RouteHost).
 
 struct AgentsPage: View {
 
     var body: some View {
-        EmptyStateView(icon: "hammer", title: tr("layout", "nav.agents"))
+        AgentsUIListPage()
     }
 }
 
@@ -14,28 +14,29 @@ struct AgentDetailPage: View {
     let agentID: String
 
     var body: some View {
-        EmptyStateView(icon: "hammer", title: "AgentDetailPage")
+        AgentsUIDetailPage(agentID: agentID)
+            .id(agentID)
     }
 }
 
 struct ChooseCreateAgentMethodPage: View {
 
     var body: some View {
-        EmptyStateView(icon: "hammer", title: "ChooseCreateAgentMethodPage")
+        AgentsUIChooseMethodPage()
     }
 }
 
 struct ManualCreateAgentPage: View {
 
     var body: some View {
-        EmptyStateView(icon: "hammer", title: "ManualCreateAgentPage")
+        AgentsUIManualCreatePage()
     }
 }
 
 struct AICreateAgentPage: View {
 
     var body: some View {
-        EmptyStateView(icon: "hammer", title: "AICreateAgentPage")
+        AgentsUIAICreatePage()
     }
 }
 
@@ -43,6 +44,7 @@ struct AIBuilderSessionPage: View {
     let sessionID: String
 
     var body: some View {
-        EmptyStateView(icon: "hammer", title: "AIBuilderSessionPage")
+        AgentsUIBuilderSessionPage(sessionID: sessionID)
+            .id(sessionID)
     }
 }

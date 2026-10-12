@@ -245,6 +245,7 @@ public final class WorkspaceSession {
 
         case .taskLifecycle(let e):
             issues.applyTaskLifecycle(e)
+            bump("task")
             if let d = details[e.issueID] {
                 d.applyLifecycle(e)
                 if !e.status.isActive, let t = d.existingTranscript(e.taskID) {
