@@ -85,6 +85,26 @@ extension WorkspaceSession {
     }
 }
 
+extension View {
+    /// Re-runs `action` when `id` or any of the session revisions change.
+    /// The revisions are read inside the modifier so an unrelated realtime
+    /// event re-evaluates only this modifier, not the page body.
+    func skillsRefetch(on keys: [String], id: String, _ action: @escaping @MainActor () async -> Void) -> some View {
+        modifier(SkillsRevisionTask(keys: keys, id: id, action: action))
+    }
+}
+
+private struct SkillsRevisionTask: ViewModifier {
+    @Environment(WorkspaceSession.self) private var session
+    let keys: [String]
+    let id: String
+    let action: @MainActor () async -> Void
+
+    func body(content: Content) -> some View {
+        content.task(id: ([id] + keys.map { String(session.revision($0)) }).joined(separator: "|")) { await action() }
+    }
+}
+
 enum SkillsLinks {
     static func docsURL() -> URL {
         let lang = L10n.shared.language

@@ -48,17 +48,25 @@ public final class SkillsStore {
         }
     }
 
+    /// Revisions are one observable dictionary, so every resource event
+    /// fires this; only a changed label revision refetches.
     private func observeLabelEvents() {
         guard let session else { return }
-        withObservationTracking {
-            _ = session.revision("label")
+        let seen = withObservationTracking {
+            session.revision("label")
         } onChange: { [weak self] in
-            Task { @MainActor in
-                guard let self else { return }
-                await self.labels.refreshIfLoaded()
-                self.observeLabelEvents()
-            }
+            Task { @MainActor in self?.labelRevisionMayHaveChanged() }
         }
+        lastLabelRevision = seen
+    }
+
+    @ObservationIgnored private var lastLabelRevision = 0
+
+    private func labelRevisionMayHaveChanged() {
+        guard let session else { return }
+        let changed = session.revision("label") != lastLabelRevision
+        observeLabelEvents()
+        if changed { Task { await labels.refreshIfLoaded() } }
     }
 
     // MARK: Runtime local skills

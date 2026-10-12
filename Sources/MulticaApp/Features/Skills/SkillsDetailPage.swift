@@ -32,7 +32,7 @@ struct SkillsDetailScreen: View {
             }
         }
         .tabTitle(model.skill?.name)
-        .task(id: "\(skillID)|\(session.revision("skill"))") { await model.load(api: session.api) }
+        .skillsRefetch(on: ["skill"], id: skillID) { await model.load(api: session.api) }
         .task { await session.skillsLoadSupportingData() }
     }
 

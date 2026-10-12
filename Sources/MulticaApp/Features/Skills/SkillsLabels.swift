@@ -275,7 +275,7 @@ struct SkillsResourceLabelPicker: View {
                 chips
             }
         }
-        .task(id: "\(skillID)|\(session.revision("label"))|\(session.revision("skill"))") {
+        .skillsRefetch(on: ["label", "skill"], id: skillID) {
             if let r = try? await session.api.listLabelsForResource("skill", resourceId: skillID) { selected = r.labels }
         }
         .onChange(of: open) { if !open { query = "" } }
