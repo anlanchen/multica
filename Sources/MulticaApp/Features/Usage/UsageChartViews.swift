@@ -119,7 +119,21 @@ struct UsageBarChart: View, Equatable {
                 }
             }
         }
-        .chartXSelection(value: $selection)
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            guard let frame = proxy.plotFrame else { return }
+                            let next = proxy.value(atX: location.x - geo[frame].origin.x, as: String.self)
+                            if next != selection { selection = next }
+                        case .ended:
+                            selection = nil
+                        }
+                    }
+            }
+        }
         .font(Theme.Font.caption)
         .frame(height: 260)
     }
