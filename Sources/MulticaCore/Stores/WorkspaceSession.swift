@@ -101,6 +101,7 @@ public final class WorkspaceSession {
             }
         case "squad":
             Task { await squads.refreshIfLoaded() }
+            bump(kind)
         case "skill":
             Task { await skills.refreshIfLoaded() }
             bump(kind)
