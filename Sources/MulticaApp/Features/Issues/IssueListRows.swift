@@ -292,23 +292,8 @@ struct IssueListPropertyChip: View {
     }
 
     private var display: String {
-        guard let value else { return "" }
-        func option(_ id: String) -> String { property.config?.options?.first { $0.id == id }?.name ?? id }
-        func actor(_ ref: String) -> String {
-            let parts = ref.split(separator: ":", maxSplits: 1).map(String.init)
-            return parts.count == 2 ? session.actorInfo(type: parts[0], id: parts[1]).name : ref
-        }
-        switch property.type {
-        case "select": return value.stringValue.map(option) ?? ""
-        case "multi_select": return (value.arrayValue ?? []).compactMap(\.stringValue).map(option).joined(separator: ", ")
-        case "checkbox":
-            return value.boolValue == true ? tr("issues", "pickers.custom_property.true_label") : tr("issues", "pickers.custom_property.false_label")
-        case "date": return value.stringValue.map(IssueListFormat.shortDay) ?? ""
-        case "actor": return value.stringValue.map(actor) ?? ""
-        case "multi_actor": return (value.arrayValue ?? []).compactMap(\.stringValue).map(actor).joined(separator: ", ")
-        case "multi_text", "multi_url": return (value.arrayValue ?? []).compactMap(\.stringValue).joined(separator: ", ")
-        default: return value.stringValue ?? ""
-        }
+        if property.type == "date" { return value?.stringValue.map(IssueListFormat.shortDay) ?? "" }
+        return IssueListPropertyText.display(property, value, session: session)
     }
 }
 

@@ -151,6 +151,7 @@ enum IssueListField<Value> {
 
 /// A field write (`UpdateIssueRequest` subset) with explicit clears.
 struct IssueListPatch {
+    var title: String?
     var status: IssueStatusKey?
     var priority: IssuePriority?
     var assignee: IssueListField<ActorRef> = .unchanged
@@ -163,6 +164,7 @@ struct IssueListPatch {
 
     var json: [String: JSONValue] {
         var o: [String: JSONValue] = [:]
+        if let title { o["title"] = .string(title) }
         if let status { o["status"] = .string(status.rawValue) }
         if let priority { o["priority"] = .string(priority.rawValue) }
         switch assignee {
@@ -189,6 +191,7 @@ struct IssueListPatch {
 
     func applied(to issue: Issue) -> Issue {
         var out = issue
+        if let title { out.title = title }
         if let status {
             out.status = status
             out.statusCategory = status.builtInCategory ?? out.statusCategory

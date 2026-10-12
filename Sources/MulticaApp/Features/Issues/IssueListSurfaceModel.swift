@@ -74,6 +74,24 @@ final class IssueListSurfaceModel {
     var runConfirm: IssueListRunConfirm?
 
     @ObservationIgnored let activity = IssueListActivity()
+    @ObservationIgnored private var tableStorage: IssueListTableModel?
+    @ObservationIgnored private var ganttStorage: IssueListGanttModel?
+
+    var table: IssueListTableModel {
+        if let t = tableStorage { return t }
+        let t = IssueListTableModel(surface: self)
+        tableStorage = t
+        return t
+    }
+
+    var gantt: IssueListGanttModel {
+        if let g = ganttStorage { return g }
+        let g = IssueListGanttModel(surface: self)
+        ganttStorage = g
+        return g
+    }
+
+    func markSelfInduced() { selfInducedRevision = session.issues.changeRevision }
     @ObservationIgnored private var extras: [String: IssueListRowExtras] = [:]
     @ObservationIgnored private var fingerprint = ""
     @ObservationIgnored private var membership = ""
@@ -161,6 +179,11 @@ final class IssueListSurfaceModel {
 
     /// Every row id the surface currently shows, in display order.
     var loadedIDs: [String] {
+        if viewMode == .table { return table.visibleIssueIDs() }
+        if viewMode == .gantt { return gantt.issueIDs }
+        if viewMode == .swimlane {
+            return groupBranches.keys.sorted().flatMap { groupBranches[$0]?.ids ?? [] }
+        }
         if usesStatusSurface {
             return visibleStatuses.flatMap { statusBranches[$0]?.ids ?? [] }
         }
@@ -378,6 +401,8 @@ final class IssueListSurfaceModel {
             || old.sortBy != state.sortBy || old.sortDirection != state.sortDirection
             || old.showSubIssues != state.showSubIssues
         let shapeChanged = old.viewMode != state.viewMode || old.grouping != state.grouping
+            || old.tableGrouping != state.tableGrouping || old.tableHierarchy != state.tableHierarchy
+            || old.ganttShowCompleted != state.ganttShowCompleted
             || old.swimlaneGrouping != state.swimlaneGrouping || old.hiddenStatuses != state.hiddenStatuses
             || old.listCollapsedStatuses != state.listCollapsedStatuses
         if old.agentRunningFilter != state.agentRunningFilter && !state.agentRunningFilter { workingIssueIDs = nil }
@@ -433,12 +458,20 @@ final class IssueListSurfaceModel {
     // MARK: Loading
 
     func reload() async {
-        guard viewMode != .table && viewMode != .gantt else {
+        guard await resolveWorkingIssues() else {
             isLoading = false
             return
         }
-        guard await resolveWorkingIssues() else {
+        if viewMode == .table || viewMode == .gantt {
+            let member = IssueListQuery.membershipKey(querySpec) + viewMode.rawValue
+            if member != membership {
+                membership = member
+                if !selection.isEmpty { selection = [] }
+            }
+            isRefreshing = !isLoading
+            if viewMode == .table { await table.reload() } else { await gantt.reload() }
             isLoading = false
+            isRefreshing = false
             return
         }
         recomputeColumns()
@@ -767,6 +800,10 @@ final class IssueListSurfaceModel {
 
     /// Board columns for non-status groupings (`buildGroups` + descriptors).
     private func rebuildGroupColumns() {
+        if viewMode == .swimlane {
+            rebuildLanes()
+            return
+        }
         guard viewMode == .board else {
             groupColumns = []
             return
@@ -809,6 +846,132 @@ final class IssueListSurfaceModel {
             }
         }
         if columns != groupColumns { groupColumns = columns }
+    }
+
+    // MARK: Swimlanes
+
+    private(set) var lanes: [IssueListLane] = []
+    private(set) var laneStatusTotals: [IssueStatusKey: Int] = [:]
+
+    /// Lanes from compound descriptors (`buildServerLanes`): pinned no-X lane
+    /// first, then the user's stored order, then server order.
+    private func rebuildLanes() {
+        let grouping = state.swimlaneGrouping
+        let visible = Set(visibleStatuses)
+        var out: [IssueListLane] = []
+        var totals: [IssueStatusKey: Int] = [:]
+        for d in groupDescriptors {
+            var cells: [IssueStatusKey: String] = [:]
+            var any = false
+            for s in d.secondaryGroups ?? [] {
+                guard case .status(let raw) = IssueListGroupValue(s.value) else { continue }
+                let key = IssueStatusKey(rawValue: raw)
+                cells[key] = s.key
+                if visible.contains(key) {
+                    totals[key, default: 0] += s.count
+                    if s.count > 0 { any = true }
+                }
+            }
+            guard any else { continue }
+            var lane = IssueListLane(key: d.key, rawID: "none", cells: cells, total: d.count)
+            switch IssueListGroupValue(d.value) {
+            case .assignee(let ref) where grouping == .assignee:
+                lane.rawID = ref.map { "\($0.type):\($0.id)" } ?? "none"
+                lane.pinned = ref == nil
+                lane.title = ref.map { session.actorInfo(type: $0.type, id: $0.id).name } ?? tr("issues", "swimlane.no_assignee")
+                lane.actor = ref
+                lane.patch.assignee = IssueListField(ref)
+            case .project(let pid) where grouping == .project:
+                lane.rawID = pid ?? "none"
+                lane.pinned = pid == nil
+                lane.title = pid.map { projectsByID[$0]?.title ?? "" } ?? tr("issues", "swimlane.no_project")
+                lane.projectID = pid
+                lane.patch.projectID = IssueListField(pid)
+            case .parent(let pid, let identifier, let title, let status, let st) where grouping == .parent:
+                let unavailable = st == "unavailable"
+                lane.rawID = pid ?? "none"
+                lane.pinned = pid == nil || unavailable
+                lane.orphan = unavailable
+                lane.title = title ?? (unavailable ? tr("issues", "swimlane.other_parents") : tr("issues", "swimlane.no_parent"))
+                lane.identifier = identifier ?? ""
+                if let pid { lane.parent = (pid, IssueStatusKey(rawValue: status ?? "")) }
+                if !unavailable { lane.patch.parentIssueID = IssueListField(pid) }
+            default:
+                continue
+            }
+            out.append(lane)
+        }
+        let order = state.swimlaneOrders[grouping.rawValue] ?? []
+        let orderIndex = Dictionary(order.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { a, _ in a })
+        let natural = Dictionary(out.enumerated().map { ($0.element.rawID, $0.offset) }, uniquingKeysWith: { a, _ in a })
+        out.sort { a, b in
+            if a.pinned != b.pinned { return a.pinned }
+            switch (orderIndex[a.rawID], orderIndex[b.rawID]) {
+            case (let x?, let y?): return x < y
+            case (.some, nil): return true
+            case (nil, .some): return false
+            default: return (natural[a.rawID] ?? 0) < (natural[b.rawID] ?? 0)
+            }
+        }
+        if out != lanes { lanes = out }
+        if totals != laneStatusTotals { laneStatusTotals = totals }
+    }
+
+    /// Per status, the cards down every expanded lane (peek stepping).
+    var swimlaneColumns: [[String]] {
+        let collapsed = Set(state.collapsedSwimlanes[state.swimlaneGrouping.rawValue] ?? [])
+        return visibleStatuses.map { s in
+            lanes.filter { !collapsed.contains($0.rawID) }.flatMap { lane in lane.cells[s].flatMap { groupBranches[$0]?.ids } ?? [] }
+        }
+    }
+
+    func moveLane(_ rawID: String, before target: String) {
+        var ids = lanes.filter { !$0.pinned }.map(\.rawID)
+        guard let from = ids.firstIndex(of: rawID), ids.contains(target), rawID != target else { return }
+        ids.remove(at: from)
+        ids.insert(rawID, at: ids.firstIndex(of: target) ?? ids.count)
+        state.setSwimlaneOrder(ids)
+        rebuildLanes()
+    }
+
+    /// A card dropped into a lane × status cell.
+    func drop(_ id: String, intoLane lane: IssueListLane, status: IssueStatusKey, before beforeID: String?) {
+        guard !lane.orphan, let issue = session.issues.model(id)?.issue else { return }
+        if let entry = session.issueListStatusEntry(status), entry.archivedAt != nil, issue.status != status { return }
+        var patch = lane.patch
+        let inLane: Bool
+        switch state.swimlaneGrouping {
+        case .assignee: inLane = issue.assignee == lane.actor
+        case .project: inLane = issue.projectID == lane.projectID
+        case .parent: inLane = issue.parentIssueID == lane.parent?.id
+        }
+        if inLane {
+            patch.assignee = .unchanged
+            patch.projectID = .unchanged
+            patch.parentIssueID = .unchanged
+        }
+        if issue.status != status { patch.status = status }
+        let key = lane.cells[status]
+        let current = key.flatMap { groupBranches[$0]?.ids } ?? []
+        let order: [String]
+        if state.sortBy == "position" {
+            order = IssueListDrag.move(current, id, before: beforeID)
+            var map = positions(order)
+            map[id] = issue.position
+            patch.position = IssueListDrag.position(of: id, in: order, positions: map)
+        } else {
+            guard !(inLane && issue.status == status) else {
+                if beforeID != nil && beforeID != id { toast?(tr("issues", "board.manual_reorder_hint"), false) }
+                return
+            }
+            order = IssueListDrag.insertByPosition(current, id, position: issue.position, positions: positions(current))
+        }
+        if inLane && issue.status == status && order == current { return }
+        let a = IssueListDrag.anchors(of: id, in: order)
+        move(id, patch: patch, before: a.before, after: a.after)
+        for b in groupBranches.values where b.rawIDs.contains(id) { b.rawIDs.removeAll { $0 == id } }
+        if let key { groupBranches[key]?.rawIDs = order }
+        refilterBranches()
     }
 
     /// Drops rows whose live state left their branch (a realtime patch can move
@@ -914,6 +1077,8 @@ final class IssueListSurfaceModel {
 
     /// Columns in display order for J/K (within) and H/L (across) stepping.
     var peekColumns: [[String]] {
+        if viewMode == .table || viewMode == .gantt { return [loadedIDs] }
+        if viewMode == .swimlane { return swimlaneColumns }
         if usesStatusSurface {
             if viewMode == .list {
                 return [visibleStatuses.filter { !state.listCollapsedStatuses.contains($0.rawValue) }.flatMap { statusBranches[$0]?.ids ?? [] }]
@@ -1159,3 +1324,35 @@ final class IssueListSurfaceModel {
 }
 
 enum IssueListStep { case previous, next, left, right }
+
+/// One swimlane: an assignee, project or parent issue, with one server
+/// branch per status cell.
+struct IssueListLane: Identifiable, Equatable {
+    var key: String
+    var rawID: String
+    var pinned = false
+    var orphan = false
+    var title = ""
+    var identifier = ""
+    var parent: (id: String, status: IssueStatusKey)?
+    var projectID: String?
+    var actor: ActorRef?
+    var cells: [IssueStatusKey: String]
+    var total: Int
+    var patch = IssueListPatch()
+
+    init(key: String, rawID: String, cells: [IssueStatusKey: String], total: Int) {
+        self.key = key
+        self.rawID = rawID
+        self.cells = cells
+        self.total = total
+    }
+
+    var id: String { key }
+
+    static func == (a: IssueListLane, b: IssueListLane) -> Bool {
+        a.key == b.key && a.rawID == b.rawID && a.pinned == b.pinned && a.orphan == b.orphan && a.title == b.title
+            && a.identifier == b.identifier && a.parent?.id == b.parent?.id && a.parent?.status == b.parent?.status
+            && a.projectID == b.projectID && a.actor == b.actor && a.cells == b.cells && a.total == b.total
+    }
+}
