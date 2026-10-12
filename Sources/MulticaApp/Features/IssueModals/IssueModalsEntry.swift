@@ -1,103 +1,62 @@
 import MulticaCore
 import SwiftUI
 
-// Placeholder entry points for this area; replaced by the full screens.
+// Entry points rendered by ModalHost (upstream packages/views/modals/registry.tsx).
 
 struct CreateIssueSheet: View {
     let draft: CreateIssueDraft
     let initialMode: CreateIssueMode
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("CreateIssueSheet").font(Theme.Font.title)
-            Button(tr("common", "cancel")) { dismiss() }
-        }
-        .padding(24)
-        .frame(minWidth: 420)
+        IssueModalCreateDialog(seed: draft, initialMode: initialMode)
     }
 }
 
 struct SetParentIssueSheet: View {
     let issueID: String
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("SetParentIssueSheet").font(Theme.Font.title)
-            Button(tr("common", "cancel")) { dismiss() }
-        }
-        .padding(24)
-        .frame(minWidth: 420)
+        IssueModalSetParentDialog(issueID: issueID)
     }
 }
 
 struct MarkDuplicateIssueSheet: View {
     let issueID: String
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("MarkDuplicateIssueSheet").font(Theme.Font.title)
-            Button(tr("common", "cancel")) { dismiss() }
-        }
-        .padding(24)
-        .frame(minWidth: 420)
+        IssueModalMarkDuplicateDialog(issueID: issueID)
     }
 }
 
 struct AddChildIssueSheet: View {
     let parentID: String
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("AddChildIssueSheet").font(Theme.Font.title)
-            Button(tr("common", "cancel")) { dismiss() }
-        }
-        .padding(24)
-        .frame(minWidth: 420)
+        IssueModalAddChildDialog(parentID: parentID)
     }
 }
 
 struct DeleteIssueConfirmSheet: View {
     let issueIDs: [String]
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("DeleteIssueConfirmSheet").font(Theme.Font.title)
-            Button(tr("common", "cancel")) { dismiss() }
-        }
-        .padding(24)
-        .frame(minWidth: 420)
+        IssueModalDeleteConfirm(issueIDs: issueIDs)
     }
 }
 
 struct RunConfirmSheet: View {
     let issueID: String
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("RunConfirmSheet").font(Theme.Font.title)
-            Button(tr("common", "cancel")) { dismiss() }
-        }
-        .padding(24)
-        .frame(minWidth: 420)
+        IssueModalRunConfirm(issueID: issueID)
     }
 }
 
 struct IssueLimitUpgradeSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    var reason: IssueModalLimitReason? = nil
+    @State private var pendingReason = IssueModalPending.takeLimitReason()
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("IssueLimitUpgradeSheet").font(Theme.Font.title)
-            Button(tr("common", "cancel")) { dismiss() }
-        }
-        .padding(24)
-        .frame(minWidth: 420)
+        IssueModalLimitUpgrade(reason: reason ?? pendingReason ?? .issueLimit)
     }
 }
-
