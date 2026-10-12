@@ -68,9 +68,10 @@ public struct DaemonHealth: Sendable, Hashable, Decodable {
     public var cliVersion: String?
     public var activeTaskCount: Int?
     public var agents: [String]
+    public var workspaceCount: Int
 
     enum CodingKeys: String, CodingKey {
-        case status, pid, os, uptime, agents
+        case status, pid, os, uptime, agents, workspaces
         case daemonID = "daemon_id"
         case deviceName = "device_name"
         case serverURL = "server_url"
@@ -90,6 +91,7 @@ public struct DaemonHealth: Sendable, Hashable, Decodable {
         cliVersion = c.lossy(String.self, .cliVersion)
         activeTaskCount = c.lossy(Int.self, .activeTaskCount)
         agents = c.lossyArray(String.self, .agents)
+        workspaceCount = c.lossyArray(JSONValue.self, .workspaces).count
     }
 
     /// Mirrors Go `daemonAlive()`: "starting" means the port is bound and a
@@ -103,34 +105,47 @@ public enum DaemonState: String, Sendable, Hashable {
     case starting
     case stopping
     case stopped
+    /// Resolving or downloading the `multica` CLI (first launch).
+    case installingCLI
     case cliNotFound
     case authExpired
+    /// Automatic recovery hit its safety budget; waits for an explicit start.
+    case recoveryPaused
     case failed
 
+    /// Upstream desktop `daemonStateLabel`.
     public var label: String {
         switch self {
-        case .unknown: return "Checking…"
-        case .running: return "Running"
-        case .starting: return "Starting…"
-        case .stopping: return "Stopping…"
-        case .stopped: return "Stopped"
-        case .cliNotFound: return "CLI not found"
-        case .authExpired: return "Sign-in expired"
-        case .failed: return "Failed to start"
+        case .unknown: return tr("settings", "desktop.daemon.cli_checking")
+        case .running: return tr("settings", "desktop.daemon.state_running")
+        case .starting: return tr("settings", "desktop.daemon.state_starting")
+        case .stopping: return tr("settings", "desktop.daemon.state_stopping")
+        case .stopped, .failed: return tr("settings", "desktop.daemon.state_stopped")
+        case .installingCLI: return tr("settings", "desktop.daemon.state_installing_cli")
+        case .cliNotFound: return tr("settings", "desktop.daemon.state_cli_not_found")
+        case .authExpired: return tr("settings", "desktop.daemon.state_auth_expired")
+        case .recoveryPaused: return tr("settings", "desktop.daemon.state_recovery_paused")
         }
     }
 
-    public var isTransitioning: Bool { self == .starting || self == .stopping || self == .unknown }
+    public var isTransitioning: Bool { self == .starting || self == .stopping || self == .unknown || self == .installingCLI }
+
+    /// Stopped-like states that offer a Start button.
+    public var canStart: Bool { self == .stopped || self == .recoveryPaused || self == .failed }
 }
 
 public struct DaemonStatus: Sendable, Hashable {
     public var state: DaemonState
     public var health: DaemonHealth?
     public var message: String?
+    /// A running daemon on another OS than this Mac (e.g. inside a VM):
+    /// reachable over localhost but not controllable by the native CLI.
+    public var externallyManaged: Bool
 
-    public init(state: DaemonState, health: DaemonHealth? = nil, message: String? = nil) {
+    public init(state: DaemonState, health: DaemonHealth? = nil, message: String? = nil, externallyManaged: Bool = false) {
         self.state = state
         self.health = health
         self.message = message
+        self.externallyManaged = externallyManaged
     }
 }
