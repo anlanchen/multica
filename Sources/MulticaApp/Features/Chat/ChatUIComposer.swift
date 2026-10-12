@@ -111,7 +111,10 @@ struct ChatUIComposer: View {
                 isEditable: !submitting && !noAgent,
                 onSubmit: { submit(key: key) },
                 onFiles: uploadEnabled ? { upload($0, key: key) } : nil,
-                mentions: { mentions($0) }
+                mentions: { mentions($0) },
+                searchIssues: { await session.searchMentionIssues($0) },
+                slashCommands: { session.skillSlashCommands($0, agentID: ctx.activeAgent?.id) },
+                slashMode: .skills
             )
             .id(editorGeneration)
             .padding(.horizontal, 8)
