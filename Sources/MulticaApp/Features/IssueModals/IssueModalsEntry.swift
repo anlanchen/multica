@@ -53,9 +53,10 @@ struct RunConfirmSheet: View {
 }
 
 struct IssueLimitUpgradeSheet: View {
-    var reason: IssueModalLimitReason = .issueLimit
+    var reason: IssueModalLimitReason? = nil
+    @State private var pendingReason = IssueModalPending.takeLimitReason()
 
     var body: some View {
-        IssueModalLimitUpgrade(reason: reason)
+        IssueModalLimitUpgrade(reason: reason ?? pendingReason ?? .issueLimit)
     }
 }

@@ -123,9 +123,9 @@ struct IssueModalOptionList: View {
             onCreate?(query.trimmingCharacters(in: .whitespaces))
             return
         }
-        if let h = highlighted ?? list.first(where: { !$0.disabled && (!$0.isEmptyValue || query.isEmpty) })?.id ?? list.first(where: { !$0.disabled })?.id {
-            onPick(h)
-        }
+        let q = query.trimmingCharacters(in: .whitespaces)
+        let fallback = q.isEmpty ? list.first { !$0.disabled } : list.first { !$0.disabled && !$0.isEmptyValue }
+        if let h = highlighted ?? fallback?.id { onPick(h) }
     }
 
     private func move(_ delta: Int, in list: [IssueModalOption]) {
@@ -213,10 +213,10 @@ struct IssueModalPill<Label: View, Content: View>: View {
             }
         }
         .font(Theme.Font.caption)
+        .frame(maxWidth: 224)
         .background(Capsule().fill(shown ? Theme.selected : Color.primary.opacity(0.001)))
         .overlay(Capsule().strokeBorder(highlighted ? Theme.destructive : Color.primary.opacity(0.14), lineWidth: highlighted ? 1.5 : 1))
         .hoverHighlight(cornerRadius: 12)
-        .fixedSize()
         .popover(isPresented: $shown, arrowEdge: .bottom) {
             content { shown = false }
         }

@@ -54,6 +54,7 @@ struct IssueModalDeleteConfirm: View {
         deleting = true
         let snapshots = issueIDs.compactMap { session.issues.model($0)?.issue }
         for id in issueIDs { session.issues.remove(id) }
+        for id in issueIDs { SearchPaletteRecentCache.rows[id] = nil }
         do {
             if isBatch {
                 _ = try await session.api.batchDeleteIssues(issueIDs)
@@ -130,14 +131,18 @@ struct IssueModalRunConfirm: View {
         .frame(width: 512)
         .interactiveDismissDisabled(submitting)
         .onExitCommand { if !submitting { dismiss() } }
-        .onAppear(perform: resolveIntent)
+        .task { await resolveIntent() }
     }
 
     /// The registered payload, or the issue's current agent owner.
-    private func resolveIntent() {
+    private func resolveIntent() async {
         if let pending = IssueModalPending.runIntents.removeValue(forKey: issueID) {
             intent = pending
-        } else if let issue = session.issues.model(issueID)?.issue, let a = issue.assignee, a.type == "agent" || a.type == "squad" {
+            return
+        }
+        var issue = session.issues.model(issueID)?.issue
+        if issue == nil { issue = try? await session.api.issue(issueID) }
+        if let a = issue?.assignee, a.type == "agent" || a.type == "squad" {
             intent = IssueModalRunIntent(issueIDs: [issueID], mode: .assign, assigneeType: a.type, assigneeID: a.id)
         } else {
             dismiss()

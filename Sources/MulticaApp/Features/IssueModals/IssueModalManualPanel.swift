@@ -216,12 +216,12 @@ struct IssueModalManualPanel: View {
                                                     set: { customPropertyPickerID = $0 ? p.id : (customPropertyPickerID == p.id ? nil : customPropertyPickerID) }),
                                highlighted: propertyErrorID == p.id) {
                     IssueModalPropertyIcon(key: p.icon)
-                    Text(p.name).lineLimit(1).frame(maxWidth: 128, alignment: .leading).fixedSize()
+                    Text(p.name).lineLimit(1).frame(maxWidth: 128, alignment: .leading)
                     if let v = propertyValues[p.id] {
                         IssueModalPropertyValueDisplay(property: p, value: v)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                             .frame(maxWidth: 160, alignment: .leading)
-                            .fixedSize()
                     }
                 } content: { dismiss in
                     IssueModalPropertyEditor(property: p, value: propertyValues[p.id], onChange: { setProperty(p.id, $0) }, dismiss: dismiss)

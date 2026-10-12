@@ -22,6 +22,13 @@ enum IssueModalPending {
     /// reopen seeded with that mirror is not mistaken for an opener's seed.
     static var lastMirror: CreateIssueDraft?
 
+    static var limitReason: IssueModalLimitReason?
+
+    static func takeLimitReason() -> IssueModalLimitReason? {
+        defer { limitReason = nil }
+        return limitReason
+    }
+
     static func takeCreateContext() -> IssueModalCreateContext? {
         defer { createContext = nil }
         return createContext
@@ -42,6 +49,13 @@ extension ModalCenter {
         guard let first = intent.issueIDs.first else { return }
         IssueModalPending.runIntents[first] = intent
         present(.runConfirm(issueID: first))
+    }
+
+    /// The shared limit-recovery dialog with the copy for `reason`
+    /// (upstream showIssueLimitRecovery; Inbox uses the autopilot quota copy).
+    func issueModalShowLimitRecovery(_ reason: IssueModalLimitReason = .issueLimit) {
+        IssueModalPending.limitReason = reason
+        present(.issueLimitUpgrade)
     }
 
     /// Create dialog seeded with context the draft value has no room for:

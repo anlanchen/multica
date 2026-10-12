@@ -56,6 +56,10 @@ public struct APIError: Error, Sendable, Equatable, CustomStringConvertible {
     public var isUnauthorized: Bool { status == 401 }
     public var description: String { "HTTP \(status): \(message)" }
 
+    public static func == (a: APIError, b: APIError) -> Bool {
+        a.status == b.status && a.message == b.message
+    }
+
     static func from(status: Int, body: Data) -> APIError {
         let json = try? JSONCoders.decoder.decode(JSONValue.self, from: body)
         let message = json?["error"]?.stringValue

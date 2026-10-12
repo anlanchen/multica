@@ -63,6 +63,7 @@ struct SearchCommandPalette: View {
 
     private func list(_ model: SearchPaletteModel) -> some View {
         let q = model.trimmed
+        let selectedID = model.selected?.id
         return ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -77,7 +78,7 @@ struct SearchCommandPalette: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             ForEach(g.items) { item in
-                                SearchPaletteRow(item: item, selected: model.selected?.id == item.id, onActivate: { activate(item) })
+                                SearchPaletteRow(item: item, selected: selectedID == item.id, onActivate: { activate(item) })
                                     .id(item.id)
                                     .onHover { if $0, !item.disabled { model.selectedID = item.id } }
                             }
