@@ -249,6 +249,27 @@ final class IssueListQueryTests: XCTestCase {
     }
 }
 
+final class IssueListStoreRevisionTests: XCTestCase {
+    @MainActor func testChangeRevisionOnlyMovesOnRealChanges() {
+        let s = IssueStore()
+        var a = Issue(id: "a", number: 1, identifier: "MUL-1", title: "A", revision: 1)
+        s.upsert(a)
+        let afterInsert = s.changeRevision
+        s.upsert(a)
+        XCTAssertEqual(s.changeRevision, afterInsert, "re-absorbing an identical row must not look like a change")
+        a.title = "A2"
+        a.revision = 2
+        s.upsert(a)
+        XCTAssertEqual(s.changeRevision, afterInsert + 1)
+        s.setLabels("a", [])
+        s.remove("a")
+        XCTAssertEqual(s.changeRevision, afterInsert + 3)
+        let activity = s.activityRevision
+        s.applyTaskLifecycle(TaskLifecycle(taskID: "t", agentID: "g", issueID: "a", status: .running))
+        XCTAssertEqual(s.activityRevision, activity + 1)
+    }
+}
+
 final class IssueListClientFilterTests: XCTestCase {
     private func item(_ id: String, status: IssueStatusKey = .todo, priority: IssuePriority = .none, assignee: ActorRef? = nil,
                       project: String? = nil, start: String? = nil, due: String? = nil, props: [String: JSONValue] = [:]) -> IssueListClientFilter.Item {
