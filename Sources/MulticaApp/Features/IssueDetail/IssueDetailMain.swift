@@ -142,7 +142,7 @@ struct IssueDetailTopContent: View {
                 Divider().padding(.vertical, 32)
                 IssueDetailActivityHeader(store: store)
                     .padding(.bottom, 16)
-                IssueDetailLocalDirectoryHint(projectID: issue.projectID)
+                ProjectsLocalDirectoryHint(projectID: issue.projectID).padding(.bottom, 12)
             }
         }
     }
@@ -469,59 +469,6 @@ struct IssueDetailActivityHeader: View {
                 .foregroundStyle(.secondary)
                 .disabled(store.subscriptionPending)
             }
-        }
-    }
-}
-
-/// Upstream LocalDirectoryHint: where this machine's daemon will run the
-/// project's agents (in place or in a worktree).
-struct IssueDetailLocalDirectoryHint: View {
-    @Environment(WorkspaceSession.self) private var session
-    @Environment(AppEnvironment.self) private var env
-    let projectID: String?
-    @State private var resources: [ProjectResource] = []
-
-    var body: some View {
-        let daemonID = env.daemonStatus.health?.daemonID
-        let matches = resources.filter { $0.resourceType == "local_directory" && daemonID != nil && $0.resourceRef["daemon_id"]?.stringValue == daemonID }
-        Group {
-            if !matches.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(matches) { r in
-                        let ref = r.resourceRef
-                        let path = ref["local_path"]?.stringValue ?? ""
-                        let worktree = ref["execution_mode"]?.stringValue == "worktree"
-                        let label = [r.label, ref["label"]?.stringValue, path].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? path
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Image(systemName: worktree ? "arrow.triangle.branch" : "folder").font(.system(size: 10))
-                                Text(tr("projects", worktree ? "resources.chat_hint_worktree_prefix" : "resources.chat_hint_prefix"))
-                                    + Text(" \(label) ").foregroundColor(.primary).fontWeight(.medium)
-                                    + Text("(\(path))").font(Theme.Font.mono)
-                            }
-                            .lineLimit(1)
-                            if worktree {
-                                Text(tr("projects", "resources.chat_hint_worktree_note")).padding(.leading, 16)
-                            }
-                        }
-                    }
-                }
-                .font(Theme.Font.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: Theme.Radius.medium).fill(Color.primary.opacity(0.03)))
-                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.medium).strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4])).foregroundStyle(Theme.border))
-                .padding(.bottom, 12)
-            }
-        }
-        .task(id: projectID) {
-            guard let projectID else {
-                resources = []
-                return
-            }
-            resources = (try? await session.api.listProjectResources(projectId: projectID).resources) ?? []
         }
     }
 }
