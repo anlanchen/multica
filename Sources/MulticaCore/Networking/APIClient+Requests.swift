@@ -123,7 +123,7 @@ extension APIClient {
     /// Uploads a file as multipart/form-data (`file` field plus extra fields).
     public func upload<T: Decodable & Sendable>(
         _ path: String, fileName: String, mimeType: String, fileData: Data, fields: [String: String] = [:],
-        as type: T.Type = T.self
+        fileField: String = "file", as type: T.Type = T.self
     ) async throws -> T {
         let boundary = "multica-\(UUID().uuidString)"
         var body = Data()
@@ -135,7 +135,7 @@ extension APIClient {
             line(v)
         }
         line("--\(boundary)")
-        line("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName.replacingOccurrences(of: "\"", with: "'"))\"")
+        line("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(fileName.replacingOccurrences(of: "\"", with: "'"))\"")
         line("Content-Type: \(mimeType)")
         line("")
         body.append(fileData)

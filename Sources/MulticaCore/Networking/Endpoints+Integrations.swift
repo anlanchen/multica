@@ -214,10 +214,15 @@ extension APIClient {
 
     // MARK: Workspace subscriptions (seats)
 
-    private nonisolated func optional<T: Decodable & Sendable>(_ method: Method, _ path: String, body: JSONValue? = nil, as type: T.Type) async throws -> T? {
-        let v: JSONValue = try await call(method, path, body: body)
+    /// The subscription types are upstream's zod-transformed camelCase shapes;
+    /// the wire is snake_case.
+    private nonisolated func optional<T: Decodable & Sendable>(_ method: Method, _ path: String, body: JSONValue? = nil,
+                                                               headers: [String: String] = [:], as type: T.Type) async throws -> T? {
+        let v: JSONValue = try await call(method, path, body: body, headers: headers)
         guard !v.isNull else { return nil }
-        return try JSONCoders.decoder.decode(T.self, from: JSONCoders.encoder.encode(v))
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(T.self, from: JSONCoders.encoder.encode(v))
     }
 
     public nonisolated func getWorkspaceSubscriptionSummary() async throws -> WorkspaceSubscriptionSummary? {
@@ -231,6 +236,7 @@ extension APIClient {
     public nonisolated func createWorkspaceSubscriptionCheckout(interval: String, idempotencyKey: String) async throws -> CreateWorkspaceSubscriptionCheckoutResponse? {
         try await optional(.post, "/api/cloud-subscriptions/checkout-sessions",
                            body: ["interval": JSONValue(interval), "idempotency_key": JSONValue(idempotencyKey)],
+                           headers: ["Idempotency-Key": idempotencyKey],
                            as: CreateWorkspaceSubscriptionCheckoutResponse.self)
     }
 
@@ -249,11 +255,11 @@ extension APIClient {
             "additional_seats": JSONValue(additionalSeats), "expected_current_seats": JSONValue(expectedCurrentSeats),
             "expected_purchase_version": JSONValue(expectedPurchaseVersion), "accepted_proration_amount": JSONValue(acceptedProrationAmount),
             "currency": JSONValue(currency), "idempotency_key": JSONValue(idempotencyKey),
-        ], as: PurchaseWorkspaceSeatsResponse.self)
+        ], headers: ["Idempotency-Key": idempotencyKey], as: PurchaseWorkspaceSeatsResponse.self)
     }
 
     public nonisolated func createWorkspaceSubscriptionPortal(idempotencyKey: String) async throws -> CreateWorkspaceSubscriptionPortalResponse? {
-        try await optional(.post, "/api/cloud-subscriptions/portal-sessions", body: ["idempotency_key": JSONValue(idempotencyKey)],
+        try await optional(.post, "/api/cloud-subscriptions/portal-sessions", headers: ["Idempotency-Key": idempotencyKey],
                            as: CreateWorkspaceSubscriptionPortalResponse.self)
     }
 }

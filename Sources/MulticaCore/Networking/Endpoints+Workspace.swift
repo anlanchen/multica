@@ -405,7 +405,8 @@ extension APIClient {
     }
 
     public func publishPluginPackage(workspaceId: String, fileName: String, data: Data) async throws -> PluginPackage {
-        try await upload("/api/workspaces/\(workspaceId)/plugins/packages", fileName: fileName, mimeType: "application/zip", fileData: data)
+        try await upload("/api/workspaces/\(workspaceId)/plugins/packages", fileName: fileName, mimeType: "application/zip", fileData: data,
+                         fileField: "bundle")
     }
 
     public nonisolated func publishLocalPluginPackage(workspaceId: String, name: String) async throws -> PluginPackage {
@@ -450,7 +451,8 @@ extension APIClient {
     }
 
     public nonisolated func listPluginInvocations(workspaceId: String, installationId: String) async throws -> [PluginInvocation] {
-        try await list("/api/workspaces/\(workspaceId)/plugins/\(installationId)/invocations")
+        try await field(.get, "/api/workspaces/\(workspaceId)/plugins/\(installationId)/invocations", "invocations",
+                        as: LossyList<PluginInvocation>.self).items
     }
 
     public nonisolated func rotatePluginToken(workspaceId: String, installationId: String) async throws -> PluginTokenIssue {
@@ -462,7 +464,8 @@ extension APIClient {
     }
 
     public nonisolated func listPluginMCPTools(workspaceId: String, installationId: String, hookKey: String) async throws -> [PluginMCPTool] {
-        try await list("/api/workspaces/\(workspaceId)/plugins/\(installationId)/mcp/\(hookKey.pathEscaped)/tools")
+        try await field(.get, "/api/workspaces/\(workspaceId)/plugins/\(installationId)/mcp/\(hookKey.pathEscaped)/tools", "tools",
+                        as: LossyList<PluginMCPTool>.self).items
     }
 
     public nonisolated func approvePluginMCPTools(workspaceId: String, installationId: String, hookKey: String, tools: [String]) async throws -> PluginInstallation {
