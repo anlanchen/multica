@@ -1,0 +1,150 @@
+import XCTest
+@testable import MulticaCore
+
+final class TimestampTests: XCTestCase {
+    func testParsesUTCAndFractions() {
+        XCTAssertEqual(Timestamp.parse("1970-01-01T00:00:00Z")?.timeIntervalSince1970, 0)
+        XCTAssertEqual(Timestamp.parse("2026-09-01T12:30:15Z")?.timeIntervalSince1970, 1_788_265_815)
+        let frac = Timestamp.parse("2026-09-01T12:30:15.250Z")!.timeIntervalSince1970
+        XCTAssertEqual(frac, 1_788_265_815.25, accuracy: 1e-6)
+    }
+
+    func testParsesOffsets() {
+        let a = Timestamp.parse("2026-09-01T20:30:15+08:00")
+        let b = Timestamp.parse("2026-09-01T12:30:15Z")
+        XCTAssertEqual(a, b)
+        XCTAssertEqual(Timestamp.parse("2026-09-01T07:30:15-05:00"), b)
+    }
+
+    func testMatchesFoundationOnSamples() {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        for s in ["2000-02-29T23:59:59Z", "2024-12-31T00:00:00Z", "1999-01-01T01:02:03Z", "2100-03-01T10:00:00Z"] {
+            XCTAssertEqual(Timestamp.parse(s), f.date(from: s), s)
+        }
+    }
+
+    func testRejectsGarbage() {
+        XCTAssertNil(Timestamp.parse(""))
+        XCTAssertNil(Timestamp.parse("2026-13-01T00:00:00Z"))
+        XCTAssertNil(Timestamp.parse("2026-09-01"))
+        XCTAssertNil(Timestamp.parse("2026-09-01T00:00:00Zjunk"))
+    }
+}
+
+final class DecodingTests: XCTestCase {
+    func testIssueDecodesWithMissingAndUnknownFields() throws {
+        let json = #"{"id":"i1","status":"triage_custom","priority":"bogus","assignee_type":"agent","assignee_id":"a1","labels":[{"id":"l1"},{"bad":true}],"future_field":{"x":1}}"#
+        let issue = try JSONCoders.decoder.decode(Issue.self, from: Data(json.utf8))
+        XCTAssertEqual(issue.status.rawValue, "triage_custom")
+        XCTAssertEqual(issue.priority, .none)
+        XCTAssertEqual(issue.assignee, ActorRef(type: "agent", id: "a1"))
+        XCTAssertEqual(issue.labels.map(\.id), ["l1"])
+        XCTAssertEqual(issue.category(in: nil), .unstarted)
+    }
+
+    func testCustomStatusResolvesThroughCatalog() throws {
+        let catalog = StatusCatalog([IssueStatusEntry(id: "s", key: "qa", name: "QA", category: .started)])
+        let issue = Issue(id: "i", number: 1, identifier: "X-1", title: "t", status: "qa")
+        XCTAssertEqual(issue.category(in: catalog), .started)
+        XCTAssertEqual(catalog.columns(including: ["qa", "mystery"]), ["qa", "mystery"])
+    }
+
+    func testLossyListSkipsMalformedElements() throws {
+        let json = #"[{"id":"w1","slug":"a","name":"A"},{"name":"missing id"},{"id":"w2","slug":"b"}]"#
+        let list = try JSONCoders.decoder.decode(LossyList<Workspace>.self, from: Data(json.utf8))
+        XCTAssertEqual(list.items.map(\.id), ["w1", "w2"])
+    }
+
+    func testUpdateRequestEncodesExplicitNullToClear() throws {
+        var r = UpdateIssueRequest()
+        r.status = .done
+        r.assigneeType = .clear
+        r.assigneeID = .clear
+        let json = String(decoding: try JSONCoders.encoder.encode(r), as: UTF8.self)
+        XCTAssertEqual(json, #"{"assignee_id":null,"assignee_type":null,"status":"done"}"#)
+    }
+
+    func testUpdateRequestAppliesOptimistically() {
+        var r = UpdateIssueRequest()
+        r.status = .inReview
+        r.assigneeType = .set("agent")
+        r.assigneeID = .set("a9")
+        let before = Issue(id: "i", number: 1, identifier: "X-1", title: "t")
+        let after = r.applied(to: before)
+        XCTAssertEqual(after.status, .inReview)
+        XCTAssertEqual(after.statusCategory, .started)
+        XCTAssertEqual(after.assignee, ActorRef(type: "agent", id: "a9"))
+    }
+
+    func testTaskMessageKeepsOpenType() throws {
+        let json = #"{"task_id":"t","seq":3,"type":"future_kind","input":{"file_path":"/a.swift","n":2}}"#
+        let m = try JSONCoders.decoder.decode(TaskMessage.self, from: Data(json.utf8))
+        XCTAssertEqual(m.kind.rawValue, "future_kind")
+        XCTAssertEqual(m.input?["file_path"]?.stringValue, "/a.swift")
+        XCTAssertEqual(m.input?["n"]?.stringValue, "2")
+    }
+
+    func testJSONPreviewIsClipped() {
+        let big = JSONValue.object(["content": .string(String(repeating: "x", count: 10_000)), "file_path": .string("/f")])
+        let p = big.preview(limit: 50)
+        XCTAssertLessThanOrEqual(p.count, 51)
+        XCTAssertTrue(p.hasSuffix("…"))
+    }
+}
+
+final class DaemonProfileTests: XCTestCase {
+    // Expected values computed with the TypeScript implementation (WHATWG URL
+    // host + byte sum) to pin cross-client parity.
+    func testProfileNameMatchesElectronShell() {
+        XCTAssertEqual(DaemonProfile.deriveName(targetAPIURL: URL(string: "https://api.multica.ai")!), "desktop-api.multica.ai")
+        XCTAssertEqual(DaemonProfile.deriveName(targetAPIURL: URL(string: "http://localhost:8080")!), "desktop-localhost-8080")
+        XCTAssertEqual(DaemonProfile.deriveName(targetAPIURL: URL(string: "https://API.multica.ai:443")!), "desktop-api.multica.ai")
+    }
+
+    func testHealthPortMatchesGoCLI() {
+        XCTAssertEqual(DaemonProfile(name: "desktop-api.multica.ai").healthPort, 19681)
+        XCTAssertEqual(DaemonProfile(name: "desktop-localhost-8080").healthPort, 19544)
+        XCTAssertEqual(DaemonProfile(name: "desktop-multica-api.copilothub.ai").healthPort, 19807)
+    }
+
+    func testPathsStayInsideOwnProfile() {
+        let p = DaemonProfile(name: "desktop-x", home: URL(fileURLWithPath: "/Users/me"))
+        XCTAssertEqual(p.configURL.path, "/Users/me/.multica/profiles/desktop-x/config.json")
+        XCTAssertEqual(p.cliArguments, ["--profile", "desktop-x"])
+        XCTAssertNotEqual(p.healthPort, DaemonProfile.defaultHealthPort)
+    }
+
+    func testHealthDecodes() throws {
+        let h = try JSONCoders.decoder.decode(DaemonHealth.self, from: Data(#"{"status":"starting","pid":42,"agents":["claude"]}"#.utf8))
+        XCTAssertTrue(h.isAlive)
+        XCTAssertEqual(h.agents, ["claude"])
+    }
+}
+
+final class LogBufferTests: XCTestCase {
+    func testSplitsAcrossChunksAndBounds() {
+        var b = LogBuffer(capacity: 3)
+        XCTAssertEqual(b.append("a\nb"), ["a"])
+        XCTAssertEqual(b.append("c\nd\n"), ["bc", "d"])
+        XCTAssertEqual(b.append("e\nf\n"), ["e", "f"])
+        XCTAssertEqual(b.lines, ["d", "e", "f"])
+        XCTAssertEqual(b.append("partial"), [])
+    }
+}
+
+final class MarkdownCacheTests: XCTestCase {
+    func testParsesInlineMarkdownAndCaches() async {
+        let cache = MarkdownCache(capacity: 2)
+        let text = await cache.render("Fix **bold** and `code`\nnext line")
+        #if canImport(Darwin)
+        XCTAssertEqual(String(text.characters), "Fix bold and code\nnext line")
+        #else
+        XCTAssertFalse(text.characters.isEmpty)
+        #endif
+        XCTAssertNotNil(cache.cached("Fix **bold** and `code`\nnext line"))
+        _ = await cache.render("a")
+        _ = await cache.render("b")
+        XCTAssertNil(cache.cached("Fix **bold** and `code`\nnext line"), "oldest entry is evicted")
+    }
+}
