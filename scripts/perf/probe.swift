@@ -103,7 +103,7 @@ guard let command = args.first, args.count >= 2 else {
     FileHandle.standardError.write(Data("usage: probe snapshot|idle|launch <bundle> [seconds|args...] [--exclude substr]\n".utf8))
     exit(2)
 }
-let bundle = args[1]
+let bundle = URL(fileURLWithPath: args[1]).standardizedFileURL.path
 
 switch command {
 case "snapshot":
@@ -159,6 +159,15 @@ case "launch":
     let after = snapshot(bundle, exclude: exclude)
     emit(Launch(firstWindowMs: (firstWindow * 10).rounded() / 10, pid: pid, footprintAtWindowMB: atWindow,
                 footprintAfter5sMB: after.totalFootprintMB, processCountAfter5s: after.processCount))
+
+case "windows":
+    let owned = Set(processes(in: bundle, exclude: exclude).app.map(\.pid))
+    let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    for w in windows {
+        guard let owner = w[kCGWindowOwnerPID as String] as? Int32, owned.contains(owner), (w[kCGWindowLayer as String] as? Int) == 0 else { continue }
+        let b = w[kCGWindowBounds as String] as? [String: Any] ?? [:]
+        print("\(w[kCGWindowNumber as String] ?? 0)\t\(Int(b["Width"] as? Double ?? 0))x\(Int(b["Height"] as? Double ?? 0))\t\(w[kCGWindowName as String] ?? "")")
+    }
 
 default:
     FileHandle.standardError.write(Data("unknown command \(command)\n".utf8))
