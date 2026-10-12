@@ -312,9 +312,10 @@ public final class WorkspaceSession {
                 if let r = try? await self.api.runtimes() { self.directory.setRuntimes(r) }
                 await self.runtimeRecords.refreshIfLoaded()
             case .labels:
+                self.bump("label")
                 await self.labels.refreshIfLoaded()
             case .workspace:
-                break
+                self.bump("workspace")
             case .other:
                 if let s = try? await self.api.inboxUnreadSummary() { self.inbox.setSummary(s) }
                 if self.inbox.isLoaded, let items = try? await self.api.inbox() { self.inbox.setItems(items) }

@@ -57,6 +57,19 @@ extension APIClient {
         return try JSONCoders.decoder.decode(T.self, from: JSONCoders.encoder.encode(value))
     }
 
+    /// Whether the Connected apps page exists: only an explicit "Composio is
+    /// not configured" (or a 503) hides it, never a transient failure.
+    public func settingsComposioAvailable() async -> Bool {
+        do {
+            let _: JSONValue? = try await settingsStructuredCall(.get, "/api/integrations/composio/toolkits")
+            return true
+        } catch let e as SettingsAPIError {
+            return e.code != "composio_not_configured" && e.status != 503
+        } catch {
+            return true
+        }
+    }
+
     /// `createMember` (invite by email); seat-capacity refusals carry a code.
     public func settingsInviteMember(workspaceId: String, email: String, role: String) async throws {
         let _: JSONValue? = try await settingsStructuredCall(.post, "/api/workspaces/\(workspaceId)/members",
