@@ -224,8 +224,10 @@ private struct SettingsTimezonePicker: View {
 
 private struct SettingsComposerRows: View {
     @State private var prefs = SettingsDevicePreferences.shared
+    @Environment(WorkspaceSession.self) private var session
 
     var body: some View {
+        let chat = session.chatUI
         SettingsCardView {
             SettingsRowView(tr("settings", "preferences.sticky_comment_bar.title"), anchor: "sticky-comment-bar") {
                 Toggle("", isOn: $prefs.stickyCommentBar).toggleStyle(.switch).controlSize(.small).labelsHidden()
@@ -241,7 +243,8 @@ private struct SettingsComposerRows: View {
                 .pickerStyle(.menu)
             }
             SettingsRowView(tr("settings", "chat.floating_label"), description: tr("settings", "chat.floating_hint"), anchor: "chat") {
-                Toggle("", isOn: $prefs.floatingChatEnabled).toggleStyle(.switch).controlSize(.small).labelsHidden()
+                Toggle("", isOn: Binding(get: { chat.floatingEnabled }, set: { chat.setFloatingEnabled($0) }))
+                    .toggleStyle(.switch).controlSize(.small).labelsHidden()
                     .accessibilityLabel(tr("settings", "chat.floating_label"))
             }
         }
