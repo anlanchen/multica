@@ -11,6 +11,7 @@ struct SkillDetailPage: View {
     let skillID: String
 
     var body: some View {
-        EmptyStateView(icon: "hammer", title: "SkillDetailPage")
+        SkillsDetailScreen(skillID: skillID)
+            .id(skillID)
     }
 }

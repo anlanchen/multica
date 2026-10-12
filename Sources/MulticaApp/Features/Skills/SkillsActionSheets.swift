@@ -183,6 +183,9 @@ struct SkillsDeleteSheet: View {
     @Environment(\.dismiss) private var dismiss
     let skills: [SkillSummary]
     let agentCounts: [Int]
+    /// The detail page uses its own toasts (`detail.toast_deleted`).
+    var successMessage: String? = nil
+    var failureMessage: String? = nil
     let onDeleted: ([String]) -> Void
     @State private var deleting = false
 
@@ -224,14 +227,14 @@ struct SkillsDeleteSheet: View {
                 try await session.api.deleteSkill(skill.id)
                 deleted.append(skill.id)
             }
+            dismiss()
             onDeleted(deleted)
             await session.agentRecords.refreshIfLoaded()
-            toaster.success(tr("skills", "actions.deleted_toast", ["count": skills.count]))
-            dismiss()
+            toaster.success(successMessage ?? tr("skills", "actions.deleted_toast", ["count": skills.count]))
         } catch {
             if !deleted.isEmpty { onDeleted(deleted) }
             let message = (error as? APIError)?.message ?? error.localizedDescription
-            toaster.error(message.isEmpty ? tr("skills", "actions.delete_failed_toast") : message)
+            toaster.error(message.isEmpty ? failureMessage ?? tr("skills", "actions.delete_failed_toast") : message)
         }
     }
 }
