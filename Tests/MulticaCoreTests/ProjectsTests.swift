@@ -19,6 +19,23 @@ final class ProjectsTests: XCTestCase {
         XCTAssertEqual(ProjectsIssueMetrics(totalCount: 0, completedCount: 0).sortKey, -1)
     }
 
+    func testPatchBodyAndApply() {
+        let p = project("p", title: "A", lead: ("member", "u1"))
+        let clear = ProjectsPatch(description: .some(nil), lead: .some(nil))
+        XCTAssertEqual(clear.body, ["description": .null, "lead_type": .null, "lead_id": .null])
+        let cleared = clear.applied(to: p)
+        XCTAssertNil(cleared.leadId)
+        XCTAssertNil(cleared.leadType)
+        let set = ProjectsPatch(status: "paused", lead: ActorRef(type: "agent", id: "a1"), dueDate: "2026-11-01")
+        XCTAssertEqual(set.body, ["status": "paused", "lead_type": "agent", "lead_id": "a1", "due_date": "2026-11-01"])
+        let applied = set.applied(to: p)
+        XCTAssertEqual(applied.status, "paused")
+        XCTAssertEqual(applied.leadId, "a1")
+        XCTAssertEqual(applied.dueDate, "2026-11-01")
+        XCTAssertEqual(applied.title, "A")
+        XCTAssertEqual(ProjectsPatch().body, [:])
+    }
+
     func testViewStateDefaultsAndSortToggling() {
         var s = ProjectsViewState()
         XCTAssertEqual(s.viewMode, .compact)
@@ -212,6 +229,26 @@ final class ProjectsTests: XCTestCase {
         XCTAssertEqual(ProjectsResourceRefs.effectiveMode(chosen: nil, isGitRepo: true, advertises: false, blocker: nil), .inPlace)
         XCTAssertEqual(ProjectsResourceRefs.effectiveMode(chosen: .worktree, isGitRepo: false, advertises: true, blocker: .notGit), .inPlace)
         XCTAssertEqual(ProjectsResourceRefs.effectiveMode(chosen: .inPlace, isGitRepo: true, advertises: true, blocker: nil), .inPlace)
+    }
+
+    func testLocalDirectoryValidation() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("projects-tests-\(UUID().uuidString)")
+        let repo = root.appendingPathComponent("repo/sub")
+        let plain = root.appendingPathComponent("plain")
+        try fm.createDirectory(at: repo, withIntermediateDirectories: true)
+        try fm.createDirectory(at: plain, withIntermediateDirectories: true)
+        try fm.createDirectory(at: root.appendingPathComponent("repo/.git"), withIntermediateDirectories: true)
+        let file = root.appendingPathComponent("file.txt")
+        try Data("x".utf8).write(to: file)
+        defer { try? fm.removeItem(at: root) }
+
+        XCTAssertEqual(ProjectsLocalDirectory.validate("relative/path"), .failed(.notAbsolute))
+        XCTAssertEqual(ProjectsLocalDirectory.validate(""), .failed(.notAbsolute))
+        XCTAssertEqual(ProjectsLocalDirectory.validate(root.appendingPathComponent("missing").path), .failed(.notFound))
+        XCTAssertEqual(ProjectsLocalDirectory.validate(file.path), .failed(.notADirectory))
+        XCTAssertEqual(ProjectsLocalDirectory.validate(repo.path), .ok(isGitRepo: true))
+        XCTAssertEqual(ProjectsLocalDirectory.validate(plain.path), .ok(isGitRepo: false))
     }
 
     func testPinyinMatching() {

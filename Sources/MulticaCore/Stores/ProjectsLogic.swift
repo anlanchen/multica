@@ -32,6 +32,64 @@ public struct ProjectsIssueMetrics: Equatable, Sendable {
     public var sortKey: Double { totalCount > 0 ? fraction : -1 }
 }
 
+/// A partial project update: applied locally for the optimistic write and
+/// sent as-is, so clearing a field sends an explicit `null`.
+public struct ProjectsPatch: Equatable, Sendable {
+    public var title: String?
+    public var description: String??
+    public var icon: String?
+    public var status: String?
+    public var priority: String?
+    /// `.some(nil)` clears the lead.
+    public var lead: ActorRef??
+    public var startDate: String??
+    public var dueDate: String??
+
+    public init(title: String? = nil, description: String?? = nil, icon: String? = nil, status: String? = nil,
+                priority: String? = nil, lead: ActorRef?? = nil, startDate: String?? = nil, dueDate: String?? = nil) {
+        self.title = title
+        self.description = description
+        self.icon = icon
+        self.status = status
+        self.priority = priority
+        self.lead = lead
+        self.startDate = startDate
+        self.dueDate = dueDate
+    }
+
+    public var body: [String: JSONValue] {
+        var o: [String: JSONValue] = [:]
+        if let title { o["title"] = .string(title) }
+        if let description { o["description"] = JSONValue(description) }
+        if let icon { o["icon"] = .string(icon) }
+        if let status { o["status"] = .string(status) }
+        if let priority { o["priority"] = .string(priority) }
+        if let lead {
+            o["lead_type"] = JSONValue(lead?.type)
+            o["lead_id"] = JSONValue(lead?.id)
+        }
+        if let startDate { o["start_date"] = JSONValue(startDate) }
+        if let dueDate { o["due_date"] = JSONValue(dueDate) }
+        return o
+    }
+
+    public func applied(to p: Project) -> Project {
+        var p = p
+        if let title { p.title = title }
+        if let description { p.description = description }
+        if let icon { p.icon = icon }
+        if let status { p.status = status }
+        if let priority { p.priority = priority }
+        if let lead {
+            p.leadType = lead?.type
+            p.leadId = lead?.id
+        }
+        if let startDate { p.startDate = startDate }
+        if let dueDate { p.dueDate = dueDate }
+        return p
+    }
+}
+
 // MARK: - View state (upstream useProjectViewStore)
 
 public enum ProjectsViewMode: String, Codable, Sendable, CaseIterable {
@@ -447,6 +505,40 @@ public enum ProjectsResourceRefs {
         if blocker != nil { return .inPlace }
         if let chosen { return chosen }
         return isGitRepo == true && advertises ? .worktree : .inPlace
+    }
+}
+
+/// The desktop shell's `local-directory:validate` (apps/desktop/src/main/local-directory.ts).
+public enum ProjectsLocalDirectory {
+    public enum Failure: Equatable, Sendable {
+        case notAbsolute, notFound, notADirectory, notReadable, notWritable
+        case error(String)
+    }
+
+    public enum Validation: Equatable, Sendable {
+        case ok(isGitRepo: Bool)
+        case failed(Failure)
+    }
+
+    public static func validate(_ path: String, fileManager: FileManager = .default) -> Validation {
+        guard !path.isEmpty, path.hasPrefix("/") else { return .failed(.notAbsolute) }
+        var isDir: ObjCBool = false
+        guard fileManager.fileExists(atPath: path, isDirectory: &isDir) else { return .failed(.notFound) }
+        guard isDir.boolValue else { return .failed(.notADirectory) }
+        guard fileManager.isReadableFile(atPath: path) else { return .failed(.notReadable) }
+        guard fileManager.isWritableFile(atPath: path) else { return .failed(.notWritable) }
+        return .ok(isGitRepo: isInsideGitWorkTree(path, fileManager: fileManager))
+    }
+
+    /// Walks up looking for `.git` (a directory, or a file in linked worktrees).
+    public static func isInsideGitWorkTree(_ path: String, fileManager: FileManager = .default) -> Bool {
+        var current = URL(fileURLWithPath: path).standardizedFileURL
+        while true {
+            if fileManager.fileExists(atPath: current.appendingPathComponent(".git").path) { return true }
+            let parent = current.deletingLastPathComponent()
+            if parent.path == current.path { return false }
+            current = parent
+        }
     }
 }
 
