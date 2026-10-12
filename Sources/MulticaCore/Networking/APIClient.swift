@@ -43,19 +43,37 @@ public struct URLSessionTransport: HTTPTransport {
 public struct APIError: Error, Sendable, Equatable, CustomStringConvertible {
     public var status: Int
     public var message: String
+    /// The body's machine-readable `code` (e.g. "invalid_timezone").
+    public var code: String?
+    /// The body's `reason_code` (dispatch admission failures).
+    public var reasonCode: String?
 
-    public init(status: Int, message: String) {
+    public init(status: Int, message: String, code: String? = nil, reasonCode: String? = nil) {
         self.status = status
         self.message = message
+        self.code = code
+        self.reasonCode = reasonCode
     }
 
     public var isUnauthorized: Bool { status == 401 }
     public var description: String { "HTTP \(status): \(message)" }
 
     static func from(status: Int, body: Data) -> APIError {
-        struct ErrorBody: Decodable { var error: String? }
-        let message = (try? JSONCoders.decoder.decode(ErrorBody.self, from: body))?.error
-        return APIError(status: status, message: message ?? "Request failed with status \(status)")
+        struct ErrorBody: Decodable {
+            var error: String?
+            var code: String?
+            var reasonCode: String?
+            enum CodingKeys: String, CodingKey { case error, code, reasonCode = "reason_code" }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                error = try? c.decode(String.self, forKey: .error)
+                code = try? c.decode(String.self, forKey: .code)
+                reasonCode = try? c.decode(String.self, forKey: .reasonCode)
+            }
+        }
+        let parsed = try? JSONCoders.decoder.decode(ErrorBody.self, from: body)
+        return APIError(status: status, message: parsed?.error ?? "Request failed with status \(status)",
+                        code: parsed?.code, reasonCode: parsed?.reasonCode)
     }
 }
 
