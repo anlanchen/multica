@@ -193,7 +193,12 @@ struct AgentsUIUnfinishedDrafts: View {
 @Observable
 final class AgentsUIBuilderModel {
     let sessionID: String
-    private(set) var messages: [ChatMessage] = []
+    private(set) var messages: [ChatMessage] = [] {
+        didSet { updateLatestDraft() }
+    }
+    /// The newest assistant reply carrying an `<agent_draft>` block.
+    private(set) var latestDraftID: String?
+    @ObservationIgnored private(set) var latestDraftPayload: [String: JSONValue]?
     private(set) var messagesLoaded = false
     private(set) var missing = false
     private(set) var pendingTaskID: String?
@@ -208,6 +213,18 @@ final class AgentsUIBuilderModel {
     @ObservationIgnored private var pendingDraft: AgentsUI.StoredDraft?
 
     init(sessionID: String) { self.sessionID = sessionID }
+
+    private func updateLatestDraft() {
+        for m in messages.reversed() where m.role == "assistant" {
+            if let payload = AgentsUI.parseBuilderDraft(m.content) {
+                latestDraftPayload = payload
+                if latestDraftID != m.id { latestDraftID = m.id }
+                return
+            }
+        }
+        latestDraftPayload = nil
+        if latestDraftID != nil { latestDraftID = nil }
+    }
 
     var pending: Bool { pendingTaskID != nil }
 
@@ -408,7 +425,7 @@ struct AgentsUIBuilderSessionPage: View {
         }
         .task(id: session.agentsUISyncKey) { session.agentsUISync() }
         .onChange(of: draft) { model.scheduleSave(draft, api: session.api) }
-        .onChange(of: latestDraftMessage?.id) { applyLatestDraft() }
+        .onChange(of: model.latestDraftID) { applyLatestDraft() }
         .onChange(of: model.restored) { applyLatestDraft() }
         .onChange(of: model.missing) { if model.missing { leave() } }
         .onDisappear { model.flush(api: session.api) }
@@ -427,13 +444,9 @@ struct AgentsUIBuilderSessionPage: View {
         }
     }
 
-    private var latestDraftMessage: ChatMessage? {
-        model.messages.last { $0.role == "assistant" && AgentsUI.parseBuilderDraft($0.content) != nil }
-    }
-
     private func applyLatestDraft() {
-        guard model.restored, let m = latestDraftMessage, m.id != model.appliedMessageID, let payload = AgentsUI.parseBuilderDraft(m.content) else { return }
-        model.appliedMessageID = m.id
+        guard model.restored, let id = model.latestDraftID, id != model.appliedMessageID, let payload = model.latestDraftPayload else { return }
+        model.appliedMessageID = id
         let validModels: Set<String>? = {
             guard let rt = session.runtimeRecords.item(draft.runtimeId), rt.status == "online",
                   case .loaded(let r) = store.modelsState(rt.id) else { return nil }

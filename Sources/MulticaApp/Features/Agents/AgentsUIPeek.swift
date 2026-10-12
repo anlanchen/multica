@@ -153,7 +153,7 @@ struct AgentsUIActivityHoverContent: View {
         }
     }
 
-    private func row(_ task: AgentTaskRecord, now: Date) -> some View {
+    func row(_ task: AgentTaskRecord, now: Date) -> some View {
         let agent = session.agentRecords.item(task.agentId)
         let availability = agent.map { AgentsUI.presence(agent: $0, runtime: session.runtimeRecords.item($0.runtimeId), tasks: [], now: now).availability } ?? .offline
         let running = task.status == "running"
@@ -174,5 +174,41 @@ struct AgentsUIActivityHoverContent: View {
             }
         }
         .font(Theme.Font.caption)
+    }
+}
+
+/// Workspace-wide variant: active runs grouped by issue.
+struct AgentsUIWorkspaceActivityHoverContent: View {
+    let issues: [Issue]
+    let tasksByIssue: [String: [AgentTaskRecord]]
+    let taskCount: Int
+
+    var body: some View {
+        Group {
+            if issues.isEmpty {
+                Text(tr("issues", "agent_activity.empty_hover")).font(Theme.Font.caption).foregroundStyle(.secondary)
+            } else {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(tr("issues", "agent_activity.issues_count", ["count": issues.count]) + " · "
+                             + tr("issues", "agent_activity.tasks_count", ["count": taskCount]))
+                            .font(Theme.Font.caption.weight(.medium)).foregroundStyle(.secondary)
+                        ForEach(issues) { issue in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text(issue.identifier).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                                    Text(issue.title).font(Theme.Font.caption).lineLimit(1)
+                                }
+                                ForEach(tasksByIssue[issue.id] ?? [], id: \.id) { t in
+                                    AgentsUIActivityHoverContent(tasks: [t]).row(t, now: context.date)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 320, alignment: .leading)
     }
 }

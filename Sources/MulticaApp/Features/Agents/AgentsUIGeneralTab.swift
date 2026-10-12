@@ -119,12 +119,14 @@ struct AgentsUIGeneralTab: View {
     let onUpdate: ([String: JSONValue]) async throws -> Void
 
     enum SaveState { case idle, saving, saved, failed }
+    enum Field: Hashable { case name, description, concurrency }
 
     @State private var name = ""
     @State private var description = ""
     @State private var saveState: SaveState = .idle
     @State private var saveTask: Task<Void, Never>?
     @State private var concurrency = ""
+    @FocusState private var focus: Field?
 
     private var canDiscover: Bool {
         guard let runtime else { return false }
@@ -149,6 +151,7 @@ struct AgentsUIGeneralTab: View {
                         VStack(alignment: .leading, spacing: 4) {
                             TextField("", text: $name)
                                 .textFieldStyle(.roundedBorder)
+                                .focused($focus, equals: .name)
                                 .disabled(!canEdit)
                                 .onSubmit { flush() }
                             if name.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -159,6 +162,7 @@ struct AgentsUIGeneralTab: View {
                     AgentsUISettingsRow(label: tr("agents", "inspector.description_label"), alignTop: true) {
                         VStack(alignment: .leading, spacing: 4) {
                             TextEditor(text: $description)
+                                .focused($focus, equals: .description)
                                 .font(Theme.Font.body)
                                 .frame(height: 96)
                                 .scrollContentBackground(.hidden)
@@ -203,6 +207,7 @@ struct AgentsUIGeneralTab: View {
                     AgentsUISettingsRow(label: tr("agents", "inspector.prop_concurrency")) {
                         VStack(alignment: .leading, spacing: 4) {
                             TextField("", text: $concurrency)
+                                .focused($focus, equals: .concurrency)
                                 .textFieldStyle(.roundedBorder)
                                 .font(Theme.Font.mono)
                                 .disabled(!canEdit)
@@ -217,6 +222,10 @@ struct AgentsUIGeneralTab: View {
         .onAppear(perform: seed)
         .onChange(of: agent.id) { seed() }
         .onChange(of: agent.maxConcurrentTasks) { concurrency = String(agent.maxConcurrentTasks) }
+        .onChange(of: focus) { old, _ in
+            if old == .concurrency { commitConcurrency() }
+            if old == .name || old == .description { flush() }
+        }
         .onChange(of: name) { schedule() }
         .onChange(of: description) { schedule() }
         .onDisappear {

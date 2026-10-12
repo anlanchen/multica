@@ -417,5 +417,9 @@ final class AgentsUITests: XCTestCase {
         let fallback = [AgentConversationStarter(label: "F", prompt: "f")]
         XCTAssertTrue(AgentsUI.selectConversationStarters([AgentConversationStarter(label: "x", prompt: " ")], fallback: fallback).isFallback)
         XCTAssertFalse(AgentsUI.selectConversationStarters([AgentConversationStarter(label: "x", prompt: "y")], fallback: fallback).isFallback)
+        XCTAssertTrue(AgentsUI.canCustomizeConversationStarters(agent(), supported: true, canEdit: true))
+        XCTAssertFalse(AgentsUI.canCustomizeConversationStarters(agent(archived: true), supported: true, canEdit: true))
+        XCTAssertFalse(AgentsUI.canCustomizeConversationStarters(agent(), supported: false, canEdit: true))
+        XCTAssertFalse(AgentsUI.canCustomizeConversationStarters(nil, supported: true, canEdit: true))
     }
 }

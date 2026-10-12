@@ -425,7 +425,7 @@ struct AgentsUIListGrid: View {
                         headerRow(visible: visible, rows: rows)
                     }
                 }
-                .frame(minWidth: max(geo.size.width, AgentsUIColumns.minWidth(visible)), alignment: .leading)
+                .frame(width: max(geo.size.width, AgentsUIColumns.minWidth(visible)), alignment: .leading)
             }
         }
     }

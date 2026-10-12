@@ -821,6 +821,13 @@ extension AgentsUI {
         return .raw(reason)
     }
 
+    /// Whether a chat's empty state may offer "customize starters" for this
+    /// agent: live agent, backend support, and edit rights.
+    public static func canCustomizeConversationStarters(_ agent: AgentRecord?, supported: Bool, canEdit: Bool) -> Bool {
+        guard let agent, agent.archivedAt == nil, supported else { return false }
+        return canEdit
+    }
+
     /// Picks the configured starters when complete, else the fallbacks.
     public static func selectConversationStarters(_ configured: [AgentConversationStarter]?, fallback: [AgentConversationStarter])
         -> (starters: [AgentConversationStarter], isFallback: Bool) {
