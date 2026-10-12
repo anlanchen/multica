@@ -145,6 +145,8 @@ public struct RuntimesUsageTotals: Sendable, Hashable {
     public var cost = 0.0
     public var cacheSavings = 0.0
     public var tokens: Int { input + output + cacheRead + cacheWrite }
+
+    public init() {}
 }
 
 public struct RuntimesHeatmapCell: Sendable, Hashable, Identifiable {
