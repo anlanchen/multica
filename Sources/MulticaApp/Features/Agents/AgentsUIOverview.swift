@@ -121,7 +121,10 @@ struct AgentsUIActivityTab: View {
         }
         .task(id: agent.id) { await recent.reload(agentID: agent.id, api: session.api) }
         .task(id: session.revision("task")) {
-            if recent.loaded { await recent.reload(agentID: agent.id, api: session.api) }
+            guard recent.loaded else { return }
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            await recent.reload(agentID: agent.id, api: session.api)
         }
         .onChange(of: (active + shown).map(\.issueId), initial: true) { _, ids in
             recent.resolveIssues(ids, session: session)

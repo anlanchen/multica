@@ -281,6 +281,18 @@ extension AgentsUI {
     }
 }
 
+extension AgentsUI {
+    /// Live elapsed time for an active run: "42s", "3m 07s", "1h 05m".
+    public static func formatElapsed(since start: Date, now: Date) -> String {
+        let sec = max(0, Int(now.timeIntervalSince(start).rounded()))
+        func pad(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
+        if sec < 60 { return "\(sec)s" }
+        let min = sec / 60
+        if min < 60 { return "\(min)m \(pad(sec % 60))s" }
+        return "\(min / 60)h \(pad(min % 60))m"
+    }
+}
+
 // MARK: - List view state
 
 extension AgentsUI {

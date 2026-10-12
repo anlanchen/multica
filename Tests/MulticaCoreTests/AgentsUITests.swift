@@ -121,6 +121,11 @@ final class AgentsUITests: XCTestCase {
         XCTAssertEqual(AgentsUI.formatDuration(ms: 12_000), "12s")
         XCTAssertEqual(AgentsUI.formatDuration(ms: 124_000), "2m 04s")
         XCTAssertEqual(AgentsUI.formatDuration(ms: 5_400_000), "1h 30m")
+        let t0 = Date(timeIntervalSince1970: 0)
+        XCTAssertEqual(AgentsUI.formatElapsed(since: t0, now: t0.addingTimeInterval(42)), "42s")
+        XCTAssertEqual(AgentsUI.formatElapsed(since: t0, now: t0.addingTimeInterval(187)), "3m 07s")
+        XCTAssertEqual(AgentsUI.formatElapsed(since: t0, now: t0.addingTimeInterval(3900)), "1h 05m")
+        XCTAssertEqual(AgentsUI.formatElapsed(since: t0.addingTimeInterval(10), now: t0), "0s")
     }
 
     // MARK: List

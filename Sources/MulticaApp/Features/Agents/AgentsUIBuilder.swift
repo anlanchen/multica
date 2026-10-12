@@ -399,6 +399,10 @@ struct AgentsUIBuilderSessionPage: View {
             model.restore(from: summary, runtimeID: summary?.runtimeId.isEmpty == false ? summary!.runtimeId : (nav.query("runtime") ?? ""), into: &draft)
         }
         .task(id: session.revision("chat") &+ session.revision("task")) {
+            if model.messagesLoaded {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+            }
             await model.refresh(api: session.api)
             if !model.pending { await model.checkRestores(api: session.api) }
         }
