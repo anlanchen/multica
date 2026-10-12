@@ -169,6 +169,50 @@ public enum SquadsListQuery {
     }
 }
 
+/// Geometry of the avatar cropper: the image covers a square viewport at
+/// zoom 1, pans within bounds, and the visible square maps back to image
+/// pixels (upstream avatar-crop-dialog + react-easy-crop).
+public enum SquadsAvatarCrop {
+    public static let outputSize = 512
+    public static let zoomRange: ClosedRange<Double> = 1...3
+
+    /// Image size after a rotation by a multiple of 90°.
+    public static func rotatedSize(_ size: CGSize, quarterTurns: Int) -> CGSize {
+        quarterTurns % 2 == 0 ? size : CGSize(width: size.height, height: size.width)
+    }
+
+    /// Points per image pixel at the given zoom.
+    public static func scale(image: CGSize, viewport: Double, zoom: Double) -> Double {
+        let short = Double(min(image.width, image.height))
+        guard short > 0 else { return 1 }
+        return viewport / short * min(zoomRange.upperBound, max(zoomRange.lowerBound, zoom))
+    }
+
+    /// Keeps the viewport covered: the image center may move at most half
+    /// the overhang in each direction.
+    public static func clampOffset(_ offset: CGSize, image: CGSize, viewport: Double, zoom: Double) -> CGSize {
+        let s = scale(image: image, viewport: viewport, zoom: zoom)
+        let w = Double(image.width), h = Double(image.height)
+        let dx = Double(offset.width), dy = Double(offset.height)
+        let maxX = max(0, (w * s - viewport) / 2)
+        let maxY = max(0, (h * s - viewport) / 2)
+        return CGSize(width: min(maxX, max(-maxX, dx)), height: min(maxY, max(-maxY, dy)))
+    }
+
+    /// The visible square in image pixels (top-left origin).
+    public static func cropRect(image: CGSize, viewport: Double, zoom: Double, offset: CGSize) -> CGRect {
+        let s = scale(image: image, viewport: viewport, zoom: zoom)
+        let o = clampOffset(offset, image: image, viewport: viewport, zoom: zoom)
+        let w = Double(image.width), h = Double(image.height)
+        let ox = Double(o.width), oy = Double(o.height)
+        let side: Double = viewport / s
+        let half: Double = side * 0.5
+        let x: Double = w * 0.5 - ox / s - half
+        let y: Double = h * 0.5 - oy / s - half
+        return CGRect(origin: CGPoint(x: x, y: y), size: CGSize(width: side, height: side))
+    }
+}
+
 public enum SquadsText {
     /// Upstream initials: first letter of each space-separated word, max 2.
     public static func initials(_ name: String) -> String {
