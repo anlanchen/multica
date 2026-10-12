@@ -186,6 +186,8 @@ final class AppEnvironment {
     func signOut() async {
         tabs.reset()
         myInvitations = []
+        await daemon?.signOutCleanup()
+        autoStartAttemptedFor = nil
         await app.signOut()
     }
 
@@ -282,18 +284,20 @@ final class AppEnvironment {
                 self?.daemonStatus = status
             }
         }
-        Task { await controller.startPolling() }
+        runtimesInstallDaemonQuitHook(controller)
+        Task {
+            await controller.bootstrap()
+            await controller.startPolling()
+        }
     }
 
-    /// Mirrors the official desktop app: once signed in, this computer comes
-    /// online as a runtime unless the user turned that off.
+    /// Mirrors the official desktop app: on sign-in the daemon's token is
+    /// synced to this user, and this computer comes online as a runtime
+    /// unless the user turned auto-start off.
     func autoStartIfNeeded() async {
-        guard autoStartDaemon, let user = app.user, autoStartAttemptedFor != user.id, let daemon else { return }
+        guard let user = app.user, autoStartAttemptedFor != user.id, let daemon else { return }
         autoStartAttemptedFor = user.id
-        let status = await daemon.refresh()
-        if status.state == .stopped {
-            await daemon.start(userID: user.id)
-        }
+        await daemon.syncLogin(userID: user.id, autoStart: autoStartDaemon)
     }
 
     func startDaemon() async {
