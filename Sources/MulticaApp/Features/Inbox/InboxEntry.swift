@@ -198,6 +198,7 @@ private struct InboxList: View {
     @Environment(Navigator.self) private var nav
     let model: InboxPageModel
     @State private var nonce = 0
+    @State private var middleClickMonitor: Any?
 
     var body: some View {
         let items = model.visibleItems
@@ -228,7 +229,13 @@ private struct InboxList: View {
         } else {
             List(selection: selection) {
                 ForEach(items) { item in
-                    InboxRow(item: item, view: model.view, onAction: { model.action(item.id) })
+                    InboxRow(item: item, view: model.view, onAction: { model.action(item.id) }, onHover: { inside in
+                        if inside {
+                            model.hoveredItem = item
+                        } else if model.hoveredItem?.id == item.id {
+                            model.hoveredItem = nil
+                        }
+                    })
                         .equatable()
                         .tag(InboxFiltering.key(item))
                         .contextMenu { InboxRowMenu(item: item, model: model) }
@@ -239,7 +246,24 @@ private struct InboxList: View {
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
+            .onAppear(perform: installMiddleClick)
+            .onDisappear(perform: removeMiddleClick)
         }
+    }
+
+    /// Middle-click opens the row's issue in a background tab.
+    private func installMiddleClick() {
+        guard middleClickMonitor == nil else { return }
+        middleClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { event in
+            guard event.buttonNumber == 2, let issueID = model.hoveredItem?.issueID else { return event }
+            nav.openInNewTab(.issue(issueID), activate: false)
+            return nil
+        }
+    }
+
+    private func removeMiddleClick() {
+        if let middleClickMonitor { NSEvent.removeMonitor(middleClickMonitor) }
+        middleClickMonitor = nil
     }
 
     private var emptyLabel: String {
@@ -263,11 +287,7 @@ private struct InboxList: View {
                     nonce += 1
                     return
                 }
-                if let item = model.visibleItems.first(where: { InboxFiltering.key($0) == newValue }) {
-                    model.click(item)
-                } else {
-                    model.select(newValue)
-                }
+                model.select(newValue)
             }
         )
     }

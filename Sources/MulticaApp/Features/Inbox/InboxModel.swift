@@ -66,8 +66,9 @@ final class InboxPageModel {
     private(set) var selectionItems: [InboxItem] = []
     private(set) var selected: InboxItem?
 
-    /// Bumped when the open row is clicked again (re-lands the highlight).
-    private(set) var highlightToken = 0
+    /// The row under the pointer, for middle-click (not observed: hover must
+    /// not re-render the list).
+    @ObservationIgnored var hoveredItem: InboxItem?
     @ObservationIgnored private var manualUnreadID: String?
     @ObservationIgnored private var lastResolvedKey = ""
     @ObservationIgnored private var markingRead: Set<String> = []
@@ -270,14 +271,6 @@ final class InboxPageModel {
         writeURL()
         recompute()
         Task { await lookupIfNeeded() }
-    }
-
-    /// A click on a row: a fresh intent, so re-clicking the open row replays
-    /// the comment highlight.
-    func click(_ item: InboxItem) {
-        let key = InboxFiltering.key(item)
-        if key == selectedKey, item.issueID != nil { highlightToken += 1 }
-        select(key)
     }
 
     /// Syncs from the tab's URL (notification click, back/forward).

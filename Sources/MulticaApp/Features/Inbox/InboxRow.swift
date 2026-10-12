@@ -8,6 +8,7 @@ struct InboxRow: View, Equatable {
     let item: InboxItem
     let view: InboxView
     let onAction: () -> Void
+    var onHover: (Bool) -> Void = { _ in }
     @State private var hovering = false
 
     static func == (a: InboxRow, b: InboxRow) -> Bool {
@@ -67,7 +68,10 @@ struct InboxRow: View, Equatable {
         }
         .padding(.vertical, 5)
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onHover { inside in
+            hovering = inside
+            onHover(inside)
+        }
     }
 }
 
