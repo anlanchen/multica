@@ -48,6 +48,9 @@ final class SkillsDetailModel {
             let fetched = try await api.getSkill(skillID)
             loadError = nil
             receive(fetched)
+        } catch let error as APIError where error.status == 404 {
+            skill = nil
+            loadError = error.message
         } catch {
             if skill == nil { loadError = (error as? APIError)?.message ?? error.localizedDescription }
         }

@@ -43,7 +43,6 @@ struct SkillsCodeEditor: NSViewRepresentable {
         context.coordinator.placeholder.stringValue = placeholder
         context.coordinator.attachPlaceholder(to: tv)
         context.coordinator.scheduleHighlight(immediate: true)
-        context.coordinator.lastFocusToken = focusToken
         return scroll
     }
 
@@ -62,7 +61,7 @@ struct SkillsCodeEditor: NSViewRepresentable {
             c.scheduleHighlight(immediate: true)
         }
         c.updatePlaceholder()
-        if focusToken != c.lastFocusToken {
+        if focusToken != 0 && focusToken != c.lastFocusToken {
             c.lastFocusToken = focusToken
             DispatchQueue.main.async {
                 tv.window?.makeFirstResponder(tv)
