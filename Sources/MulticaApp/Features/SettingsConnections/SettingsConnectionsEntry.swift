@@ -9,7 +9,7 @@ struct ConnectedAppsSettingsTab: View {
 }
 
 struct BillingSettingsTab: View {
-    var body: some View { EmptyStateView(icon: "creditcard", title: tr("settings", "page.tabs.billing")) }
+    var body: some View { ConnectionsBillingTab() }
 }
 
 struct CodeSettingsTab: View {
