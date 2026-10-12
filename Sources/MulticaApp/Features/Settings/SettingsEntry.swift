@@ -410,6 +410,7 @@ enum SettingsSearchRows {
         }
         rows += [
             row("notifications", "system", t("notifications.system.label"), t("notifications.system.description")),
+            row("notifications", "browser", trd("settings", "notifications.macos.label", "macOS notifications")),
             page("tokens", t("page.tabs.tokens"), t("tokens.purpose")),
             page("shortcuts", t("page.tabs.shortcuts"), t("shortcuts.description")),
             page("apps", t("page.tabs.apps"), t("composio.page_description")),

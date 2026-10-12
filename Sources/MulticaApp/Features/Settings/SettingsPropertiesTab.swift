@@ -51,9 +51,9 @@ struct SettingsPropertiesTab: View {
                 }
                 SettingsCatalogCard {
                     HStack(spacing: 16) {
-                        Text(tr("settings", "properties.columns.name")).frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
+                        Text(tr("settings", "properties.columns.name")).frame(minWidth: 120, maxWidth: .infinity, alignment: .leading)
                         Text(tr("settings", "properties.columns.type")).frame(width: 96, alignment: .leading)
-                        Text(tr("settings", "properties.columns.options")).frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
+                        Text(tr("settings", "properties.columns.options")).frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
                         Text(tr("settings", "properties.columns.usage")).frame(width: 96, alignment: .leading)
                         Text(tr("settings", "properties.columns.updated")).frame(width: 112, alignment: .leading)
                         Color.clear.frame(width: 28, height: 1)
@@ -106,7 +106,7 @@ struct SettingsPropertiesTab: View {
                         .overlay(Capsule().strokeBorder(Theme.border))
                 }
             }
-            .frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
+            .frame(minWidth: 120, maxWidth: .infinity, alignment: .leading)
             Text(Self.typeLabel(property.type)).font(Theme.Font.body).foregroundStyle(.secondary)
                 .frame(width: 96, alignment: .leading)
             HStack(spacing: 4) {
@@ -127,7 +127,7 @@ struct SettingsPropertiesTab: View {
                     Text("—").font(Theme.Font.caption).foregroundStyle(.secondary)
                 }
             }
-            .frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
+            .frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
             .clipped()
             Text(tr("settings", "properties.usage_count", ["count": property.usageCount ?? 0]))
                 .font(Theme.Font.body).foregroundStyle(.secondary).monospacedDigit()

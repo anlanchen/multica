@@ -25,8 +25,8 @@ struct SettingsQuickActionsTab: View {
                 }
                 SettingsCatalogCard {
                     HStack(spacing: 16) {
-                        Text(tr("settings", "quick_actions.columns.name")).frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
-                        Text(tr("settings", "quick_actions.columns.target")).frame(minWidth: 144, maxWidth: .infinity, alignment: .leading)
+                        Text(tr("settings", "quick_actions.columns.name")).frame(minWidth: 120, maxWidth: .infinity, alignment: .leading)
+                        Text(tr("settings", "quick_actions.columns.target")).frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
                         Text(tr("settings", "quick_actions.columns.visibility")).frame(width: 96, alignment: .leading)
                         Text(tr("settings", "quick_actions.columns.usage")).frame(width: 80, alignment: .leading)
                         Text(tr("settings", "quick_actions.columns.updated")).frame(width: 112, alignment: .leading)
@@ -80,11 +80,11 @@ struct SettingsQuickActionsTab: View {
                         .overlay(Capsule().strokeBorder(Theme.border))
                 }
             }
-            .frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
+            .frame(minWidth: 120, maxWidth: .infinity, alignment: .leading)
             targetLine(action)
                 .font(Theme.Font.body)
                 .lineLimit(1)
-                .frame(minWidth: 144, maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
             visibilityBadge(action).frame(width: 96, alignment: .leading)
             Text(action.useCount == 0 ? tr("settings", "quick_actions.never_used") : tr("settings", "quick_actions.used_count", ["count": action.useCount]))
                 .font(Theme.Font.body).monospacedDigit()

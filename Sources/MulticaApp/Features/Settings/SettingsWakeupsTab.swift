@@ -22,7 +22,7 @@ struct SettingsWakeupsTab: View {
                 }
             }
         }
-        .task(id: session.revision("system_wakeup")) { await load() }
+        .task { await load() }
     }
 
     private func load() async {

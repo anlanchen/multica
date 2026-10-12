@@ -58,8 +58,8 @@ struct SettingsLabelManager: View {
             }
             SettingsCatalogCard {
                 HStack(spacing: 16) {
-                    Text(tr("settings", "labels.columns.name")).frame(minWidth: 176, maxWidth: .infinity, alignment: .leading)
-                    Text(tr("settings", "labels.columns.description")).frame(minWidth: 192, maxWidth: .infinity, alignment: .leading)
+                    Text(tr("settings", "labels.columns.name")).frame(minWidth: 120, maxWidth: .infinity, alignment: .leading)
+                    Text(tr("settings", "labels.columns.description")).frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
                     Text(tr("settings", "labels.columns.usage")).frame(width: 96, alignment: .leading)
                     Text(tr("settings", "labels.columns.updated")).frame(width: 112, alignment: .leading)
                     Color.clear.frame(width: 28, height: 1)
@@ -102,10 +102,10 @@ struct SettingsLabelManager: View {
                 Circle().fill(Color(hex: label.color)).frame(width: 10, height: 10)
                 Text(label.name).font(Theme.Font.bodyMedium).lineLimit(1)
             }
-            .frame(minWidth: 176, maxWidth: .infinity, alignment: .leading)
+            .frame(minWidth: 120, maxWidth: .infinity, alignment: .leading)
             Text(label.description.flatMap { $0.isEmpty ? nil : $0 } ?? "—")
                 .font(Theme.Font.body).foregroundStyle(.secondary).lineLimit(1)
-                .frame(minWidth: 192, maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
             Text(tr("settings", "labels.usage_count", ["count": label.usageCount ?? 0]))
                 .font(Theme.Font.body).foregroundStyle(.secondary).monospacedDigit()
                 .frame(width: 96, alignment: .leading)
