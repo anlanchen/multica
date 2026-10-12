@@ -184,6 +184,8 @@ public enum AutopilotsList {
         public var creators: [ActorOption] = []
         public var modeCounts: [String: Int] = [:]
         public var triggerKindCounts: [String: Int] = [:]
+
+        public init() {}
     }
 
     public static func options(_ rows: [Autopilot]) -> Options {
