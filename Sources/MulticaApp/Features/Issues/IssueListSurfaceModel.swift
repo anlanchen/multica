@@ -71,6 +71,8 @@ final class IssueListSurfaceModel {
     var selection: Set<String> = []
     var peekID: String?
     var focusedID: String?
+    /// The card under the pointer (Space peeks it without focusing it first).
+    @ObservationIgnored var hoveredID: String?
     var runConfirm: IssueListRunConfirm?
 
     @ObservationIgnored let activity = IssueListActivity()
@@ -343,11 +345,16 @@ final class IssueListSurfaceModel {
     private func sourcesChanged() {
         guard started else { return }
         observeSources()
+        let columnsBefore = visibleStatuses
+        let projectsBefore = projectsByID
+        let propertiesBefore = activeProperties
         syncCatalogs()
         refilterBranches()
         let rev = session.issues.changeRevision
         let propsRev = session.revision("issue_properties")
-        if rev == selfInducedRevision && propsRev == lastPropertiesRevision { return }
+        let catalogMoved = columnsBefore != visibleStatuses || propertiesBefore != activeProperties
+            || (!state.projectStatusFilters.isEmpty && projectsBefore != projectsByID)
+        if rev == selfInducedRevision && propsRev == lastPropertiesRevision && !catalogMoved { return }
         lastPropertiesRevision = propsRev
         scheduleRefresh()
     }

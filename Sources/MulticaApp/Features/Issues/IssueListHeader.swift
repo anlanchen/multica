@@ -37,7 +37,7 @@ struct IssueListHeaderBar: View {
                 if config.showWorkingChip {
                     IssueListWorkingChip(model: model)
                 }
-                IssueListDisplayControls(model: model, showViewToggle: config.showViewToggle)
+                IssueListDisplayControls(model: model, showViewToggle: config.showViewToggle, showDate: config.showDateFilter)
                 if showRefresh { IssueListRefreshIndicator(active: model.isRefreshing) }
             }
             .fixedSize()
@@ -486,12 +486,13 @@ struct IssueListAvatarStack: View {
 struct IssueListDisplayControls: View {
     @Bindable var model: IssueListSurfaceModel
     var showViewToggle = true
+    var showDate = false
     @State private var filterOpen = false
     @State private var displayOpen = false
     @State private var columnsOpen = false
 
     var body: some View {
-        let count = model.state.activeFilterCount(baseline: model.baseline, activePropertyIDs: model.activePropertyIDs, includeDate: true)
+        let count = model.state.activeFilterCount(baseline: model.baseline, activePropertyIDs: model.activePropertyIDs, includeDate: showDate)
         HStack(spacing: 4) {
             Button { filterOpen.toggle() } label: {
                 Label(count > 0 ? tr("issues", "filters.active_count", ["count": count]) : tr("issues", "filters.tooltip"),
@@ -501,7 +502,7 @@ struct IssueListDisplayControls: View {
             .help(tr("issues", "filters.tooltip"))
             .popover(isPresented: $filterOpen, arrowEdge: .bottom) {
                 IssueListFilterMenu(state: $model.state, model: model, baseline: model.baseline,
-                                    showCounts: model.viewMode != .gantt, onFacet: { model.setActiveFacet($0) })
+                                    showCounts: model.viewMode != .gantt, showDate: showDate, onFacet: { model.setActiveFacet($0) })
             }
             .onChange(of: filterOpen) { _, open in if !open { model.setActiveFacet(nil) } }
 

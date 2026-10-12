@@ -94,7 +94,7 @@ struct IssueListTableView: View {
     }
 
     private func header(_ columns: [IssueListTableColumn], rows: [IssueListTableRow]) -> some View {
-        let ids = model.table.visibleIssueIDs()
+        let ids = rows.compactMap { row -> String? in if case .issue(let id, _, _, _) = row { return id } else { return nil } }
         let selected = ids.filter { model.selection.contains($0) }.count
         return HStack(spacing: 0) {
             Button {

@@ -58,6 +58,8 @@ struct IssueListSwimlaneView: View {
                     nav.push(.issue(issue.id), title: "\(issue.identifier) \(issue.title)")
                 }
             }
+            .onAppear { focused = true }
+            .onChange(of: model.peekID) { focused = true }
         }
     }
 }

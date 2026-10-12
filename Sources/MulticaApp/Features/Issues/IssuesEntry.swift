@@ -206,7 +206,8 @@ struct IssueListHost: View {
             builtins: builtins,
             activeBuiltin: active == nil ? "builtin:\(activeTab)" : nil,
             selectBuiltin: { id in selectTab(String(id.dropFirst("builtin:".count))) },
-            saveScope: saveScope
+            saveScope: saveScope,
+            showDateFilter: kind == .issues
         )
     }
 }
@@ -220,6 +221,7 @@ struct IssueListHeaderConfig {
     var saveScope: IssueListSaveScope?
     var showViewToggle = true
     var showWorkingChip = true
+    var showDateFilter = false
 }
 
 enum IssueListEmptyKind {

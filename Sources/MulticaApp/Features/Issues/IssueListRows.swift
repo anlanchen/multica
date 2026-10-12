@@ -99,7 +99,10 @@ struct IssueListRowView: View {
         )
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(peeked ? Theme.brand.opacity(0.5) : .clear, lineWidth: 1.5))
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onHover { inside in
+            hovering = inside
+            if inside { model.hoveredID = issue.id } else if model.hoveredID == issue.id { model.hoveredID = nil }
+        }
         .onTapGesture { IssueListOpen.click(issue, model: model, nav: nav) }
         .contextMenu { IssueListActionsMenu(issue: issue, model: model) }
         .accessibilityElement(children: .combine)
@@ -227,7 +230,10 @@ struct IssueListCardView: View {
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(peeked ? Theme.brand.opacity(0.5) : (hovering || focused ? Color.primary.opacity(0.15) : Theme.border), lineWidth: peeked ? 2 : 0.5))
         .shadow(color: .black.opacity(0.04), radius: 1, y: 1)
         .contentShape(RoundedRectangle(cornerRadius: 8))
-        .onHover { hovering = $0 }
+        .onHover { inside in
+            hovering = inside
+            if inside { model.hoveredID = issue.id } else if model.hoveredID == issue.id { model.hoveredID = nil }
+        }
         .onTapGesture { IssueListOpen.click(issue, model: model, nav: nav) }
         .contextMenu { IssueListActionsMenu(issue: issue, model: model) }
     }

@@ -34,6 +34,8 @@ struct IssueListListView: View {
                     nav.push(.issue(issue.id), title: "\(issue.identifier) \(issue.title)")
                 }
             }
+            .onAppear { focused = true }
+            .onChange(of: model.peekID) { focused = true }
         }
     }
 }
@@ -280,7 +282,8 @@ enum IssueListKeyboard {
             open(issue)
             return .handled
         case .space:
-            guard let id = model.focusedID else { return .ignored }
+            guard let id = model.hoveredID ?? model.focusedID else { return .ignored }
+            model.focusedID = id
             model.peekID = model.peekID == id ? nil : id
             return .handled
         default:
