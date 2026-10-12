@@ -60,7 +60,7 @@ private struct InboxNotificationDetail: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
             if isQuota {
-                InboxAutopilotQuotaNotice(item: item) { modals.present(.issueLimitUpgrade) }
+                InboxAutopilotQuotaNotice(item: item) { modals.issueModalShowLimitRecovery(.autopilotQuota) }
             } else if let body = item.body, !body.isEmpty {
                 Text(body)
                     .font(Theme.Font.body)
