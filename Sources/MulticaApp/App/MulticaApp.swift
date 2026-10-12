@@ -125,6 +125,7 @@ struct AppShell: View {
         }
         .overlay(alignment: .bottomTrailing) { ToastOverlay() }
         .modifier(ModalHost())
+        .modifier(OnboardingShellOverlays())
         .sheet(isPresented: $shell.searchOpen) {
             SearchCommandPalette()
         }
