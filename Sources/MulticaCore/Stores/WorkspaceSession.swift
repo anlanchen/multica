@@ -40,6 +40,7 @@ public final class WorkspaceSession {
 
     @ObservationIgnored private var details: [String: IssueDetailModel] = [:]
     @ObservationIgnored private var watchedTranscripts: [String: Int] = [:]
+    @ObservationIgnored private var standaloneTranscripts: [String: TranscriptModel] = [:]
     @ObservationIgnored private var eventLoop: Task<Void, Never>?
     @ObservationIgnored private var catalogRefresh: [CatalogKind: Task<Void, Never>] = [:]
     @ObservationIgnored private var nextPageOffset = 0
@@ -274,10 +275,14 @@ public final class WorkspaceSession {
         for m in batch { byTask[m.taskID, default: []].append(m) }
         for (taskID, messages) in byTask {
             let issueID = messages.first?.issueID ?? ""
-            guard let detail = details[issueID] ?? details.values.first(where: { $0.existingTranscript(taskID) != nil }) else {
+            let t: TranscriptModel
+            if let detail = details[issueID] ?? details.values.first(where: { $0.existingTranscript(taskID) != nil }) {
+                t = detail.transcript(for: taskID)
+            } else if let standalone = standaloneTranscripts[taskID] {
+                t = standalone
+            } else {
                 continue
             }
-            let t = detail.transcript(for: taskID)
             t.merge(messages)
             if t.needsRepair {
                 t.needsRepair = false
@@ -393,6 +398,19 @@ public final class WorkspaceSession {
         t.isLoading = false
     }
 
+    /// The transcript of any agent task (agent activity, autopilot runs,
+    /// chat), shared with an open issue detail when there is one. Live while
+    /// a view watches it.
+    public func transcript(taskID: String) -> TranscriptModel {
+        for d in details.values {
+            if let t = d.existingTranscript(taskID) { return t }
+        }
+        if let t = standaloneTranscripts[taskID] { return t }
+        let t = TranscriptModel(taskID: taskID)
+        standaloneTranscripts[taskID] = t
+        return t
+    }
+
     public func watchTranscript(_ t: TranscriptModel) {
         watchedTranscripts[t.id, default: 0] += 1
         if watchedTranscripts[t.id] == 1 {
@@ -407,6 +425,7 @@ public final class WorkspaceSession {
         guard let n = watchedTranscripts[t.id] else { return }
         if n <= 1 {
             watchedTranscripts[t.id] = nil
+            standaloneTranscripts[t.id] = nil
             Task { await realtime.unwatchTask(t.id) }
         } else {
             watchedTranscripts[t.id] = n - 1

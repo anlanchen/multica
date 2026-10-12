@@ -125,3 +125,9 @@ enum Formatters {
         n.formatted(.currency(code: "USD").precision(.fractionLength(n < 1 ? 4 : 2)))
     }
 }
+
+/// `tr` with a fallback for keys the upstream catalogs do not define.
+func trd(_ ns: String, _ key: String, _ fallback: String, _ args: [String: CustomStringConvertible] = [:]) -> String {
+    let s = tr(ns, key, args)
+    return s == key ? fallback : s
+}

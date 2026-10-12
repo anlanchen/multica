@@ -14,10 +14,13 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.4.app || true
       - name: Swift version
         run: swift --version
+      - name: Build app
+        run: swift build --product MulticaApp 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+      - name: Compiler errors
+        if: failure()
+        run: grep -E "error:" build.log | sort -u | head -200 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Test core
         run: swift test
-      - name: Build app
-        run: swift build --product MulticaApp
       - name: Bundle app
         run: scripts/bundle-app.sh
       - name: Benchmarks
