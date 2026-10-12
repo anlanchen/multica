@@ -106,7 +106,7 @@ public struct ActorRef: Sendable, Hashable {
     }
 }
 
-public struct Label: Sendable, Hashable, Identifiable, Decodable {
+public struct IssueLabel: Sendable, Hashable, Identifiable, Decodable {
     public var id: String
     public var name: String
     public var color: String
@@ -139,7 +139,7 @@ public struct Issue: Sendable, Hashable, Identifiable, Decodable {
     public var position: Double
     public var startDate: String?
     public var dueDate: String?
-    public var labels: [Label]
+    public var labels: [IssueLabel]
     public var createdAt: String
     public var updatedAt: String
     public var revision: Int?
@@ -208,7 +208,7 @@ public struct Issue: Sendable, Hashable, Identifiable, Decodable {
         position = c.lossy(Double.self, .position, default: 0)
         startDate = c.lossy(String.self, .startDate)
         dueDate = c.lossy(String.self, .dueDate)
-        labels = c.lossyArray(Label.self, .labels)
+        labels = c.lossyArray(IssueLabel.self, .labels)
         createdAt = c.lossy(String.self, .createdAt, default: "")
         updatedAt = c.lossy(String.self, .updatedAt, default: "")
         revision = c.lossy(Int.self, .revision)

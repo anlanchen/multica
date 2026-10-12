@@ -79,7 +79,7 @@ private struct Envelope: Decodable {
         var project_changed: Bool?
     }
     struct IssueIDPayload: Decodable { var issue_id: String }
-    struct IssueLabelsPayload: Decodable { var issue_id: String; var labels: [Label] }
+    struct IssueLabelsPayload: Decodable { var issue_id: String; var labels: [IssueLabel] }
     struct CommentPayload: Decodable { var comment: Comment }
     struct CommentDeletedPayload: Decodable { var comment_id: String; var issue_id: String }
     struct ActivityPayload: Decodable { var issue_id: String; var entry: TimelineEntry }
@@ -125,6 +125,7 @@ private struct Envelope: Decodable {
         case "issue:created", "issue:updated":
             let p = try payload(IssuePayload.self)
             result = .event(.issueUpsert(p.issue, IssueChangeFlags(
+                created: type == "issue:created",
                 statusChanged: p.status_changed ?? false,
                 assigneeChanged: p.assignee_changed ?? false,
                 projectChanged: p.project_changed ?? false)))

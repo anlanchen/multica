@@ -93,8 +93,7 @@ public actor RealtimeClient {
         loop = nil
         connection?.close()
         connection = nil
-        flushTimer?.cancel()
-        flushTimer = nil
+        flushPending()
         batcher = FixedWindowBatcher(window: batchWindow)
     }
 

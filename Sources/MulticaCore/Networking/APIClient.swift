@@ -65,6 +65,8 @@ public struct NetworkMetrics: Sendable, Equatable {
     public var deduplicated = 0
     public var bytesReceived = 0
     public var failures = 0
+
+    public init() {}
 }
 
 /// HTTP client for the Multica REST API.
@@ -134,9 +136,11 @@ public actor APIClient {
             : nil
 
         let task: Task<HTTPResponse, Error>
+        var owner = true
         if let key, let existing = inflight[key] {
             metrics.deduplicated += 1
             task = existing
+            owner = false
         } else {
             let transport = self.transport
             task = Task { try await transport.perform(request) }
@@ -153,7 +157,7 @@ public actor APIClient {
             throw error
         }
         if let key, inflight[key] == task { inflight[key] = nil }
-        metrics.bytesReceived += response.body.count
+        if owner { metrics.bytesReceived += response.body.count }
 
         guard (200..<300).contains(response.status) else {
             metrics.failures += 1

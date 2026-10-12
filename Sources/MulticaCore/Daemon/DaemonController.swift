@@ -80,6 +80,9 @@ public actor DaemonController {
     private var pollTask: Task<Void, Never>?
     private var appActive = true
     private var cliOverride: URL?
+    private var startingSince: ContinuousClock.Instant?
+    /// Longer than the CLI's own 45 s readiness wait.
+    static let startDeadline: Duration = .seconds(90)
 
     public init(api: APIClient, profile: DaemonProfile, runner: CommandRunner = ProcessRunner()) {
         self.api = api
@@ -146,7 +149,12 @@ public actor DaemonController {
         } else {
             next.health = nil
             switch status.state {
-            case .starting, .authExpired, .failed, .cliNotFound:
+            case .starting:
+                if let since = startingSince, ContinuousClock.now - since > Self.startDeadline {
+                    next.state = .failed
+                    next.message = "The daemon did not become healthy. Check the daemon log."
+                }
+            case .authExpired, .failed, .cliNotFound:
                 break // keep the explanation until the next explicit action
             default:
                 next.state = locateCLI() == nil ? .cliNotFound : .stopped
@@ -157,6 +165,11 @@ public actor DaemonController {
     }
 
     private func publish(_ s: DaemonStatus) {
+        if s.state == .starting {
+            if status.state != .starting { startingSince = .now }
+        } else {
+            startingSince = nil
+        }
         guard s != status else { return }
         status = s
         continuation.yield(s)

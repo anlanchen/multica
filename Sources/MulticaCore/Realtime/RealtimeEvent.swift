@@ -40,11 +40,13 @@ public struct TaskLifecycle: Sendable, Hashable, Decodable {
 }
 
 public struct IssueChangeFlags: Sendable, Hashable {
+    public var created = false
     public var statusChanged = false
     public var assigneeChanged = false
     public var projectChanged = false
 
-    public init(statusChanged: Bool = false, assigneeChanged: Bool = false, projectChanged: Bool = false) {
+    public init(created: Bool = false, statusChanged: Bool = false, assigneeChanged: Bool = false, projectChanged: Bool = false) {
+        self.created = created
         self.statusChanged = statusChanged
         self.assigneeChanged = assigneeChanged
         self.projectChanged = projectChanged
@@ -69,7 +71,7 @@ public enum ConnectionState: Sendable, Equatable {
 public enum RealtimeEvent: Sendable {
     case issueUpsert(Issue, IssueChangeFlags)
     case issueDeleted(issueID: String)
-    case issueLabels(issueID: String, labels: [Label])
+    case issueLabels(issueID: String, labels: [IssueLabel])
     case commentUpsert(Comment)
     case commentDeleted(commentID: String, issueID: String)
     case activity(issueID: String, entry: TimelineEntry)

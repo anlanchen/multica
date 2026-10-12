@@ -141,7 +141,9 @@ public final class IssueStore {
         scheduleResection()
     }
 
-    public func upsert(_ issue: Issue) {
+    /// `isNew` marks a creation (as opposed to an issue that merely was not
+    /// loaded yet), which is the only case that grows the server total.
+    public func upsert(_ issue: Issue, isNew: Bool = false) {
         if let m = models[issue.id] {
             guard let change = m.update(issue) else { return }
             if change.status || change.order || (change.assignee && filter != .all) || (change.text && !searchText.isEmpty) {
@@ -152,7 +154,7 @@ public final class IssueStore {
             m.activeRuns = activeTasks[issue.id]?.count ?? 0
             models[issue.id] = m
             loadedCount = models.count
-            totalOnServer += 1
+            if isNew { totalOnServer += 1 }
             scheduleResection()
         }
     }
@@ -179,7 +181,7 @@ public final class IssueStore {
         scheduleResection()
     }
 
-    public func setLabels(_ issueID: String, _ labels: [Label]) {
+    public func setLabels(_ issueID: String, _ labels: [IssueLabel]) {
         guard let m = models[issueID] else { return }
         var i = m.issue
         i.labels = labels

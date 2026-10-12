@@ -103,3 +103,14 @@ extension InboxWorkspaceUnread {
         self = try! JSONCoders.decoder.decode(InboxWorkspaceUnread.self, from: Data(json.utf8))
     }
 }
+
+final class IssueStoreTotalsTests: XCTestCase {
+    @MainActor func testOnlyCreationsGrowTheServerTotal() async {
+        let s = IssueStore()
+        s.merge(page: [Issue(id: "a", number: 1, identifier: "M-1", title: "a")], total: 10, replacing: true)
+        s.upsert(Issue(id: "far", number: 99, identifier: "M-99", title: "beyond the loaded page"))
+        XCTAssertEqual(s.totalOnServer, 10)
+        s.upsert(Issue(id: "new", number: 100, identifier: "M-100", title: "created"), isNew: true)
+        XCTAssertEqual(s.totalOnServer, 11)
+    }
+}

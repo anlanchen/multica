@@ -114,8 +114,8 @@ public final class WorkspaceSession {
 
     public func apply(_ event: RealtimeEvent) {
         switch event {
-        case .issueUpsert(let issue, _):
-            issues.upsert(issue)
+        case .issueUpsert(let issue, let flags):
+            issues.upsert(issue, isNew: flags.created)
         case .issueDeleted(let id):
             issues.remove(id)
         case .issueLabels(let id, let labels):
@@ -321,7 +321,7 @@ public final class WorkspaceSession {
     /// Creation waits for the server before the issue appears.
     public func createIssue(_ request: CreateIssueRequest) async throws -> Issue {
         let issue = try await api.createIssue(request)
-        issues.upsert(issue)
+        issues.upsert(issue, isNew: true)
         return issue
     }
 
