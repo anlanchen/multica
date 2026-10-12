@@ -10,7 +10,8 @@ struct IssueDetailMainColumn: View {
     let store: IssueDetailStore
     let find: IssueDetailFindState
     @Binding var runConfirm: IssueDetailRunGate?
-    @AppStorage("multica.commentComposer.sticky") private var sticky = true
+    @State private var prefs = SettingsDevicePreferences.shared
+    private var sticky: Bool { prefs.stickyCommentBar }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -67,6 +68,11 @@ struct IssueDetailMainColumn: View {
                 guard let id = store.scrollRequest?.id else { return }
                 let row = id == Self.topID ? id : rowID(containing: id)
                 withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(row, anchor: .top) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .searchPaletteFoldComments)) { note in
+                guard note.userInfo?["issueID"] as? String == store.issueID else { return }
+                let fold = note.userInfo?["fold"] as? Bool ?? true
+                store.collapsedThreads = fold ? Set(store.layout.items.compactMap { $0.thread?.root.id }) : []
             }
         }
     }

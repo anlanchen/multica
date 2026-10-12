@@ -62,7 +62,11 @@ struct IssueDetailComposer: View {
                            isEditable: !submitting,
                            onSubmit: submit,
                            onFiles: upload,
-                           mentions: { session.mentionCandidates($0, includeIssues: true) })
+                           mentions: { session.mentionCandidates($0, includeIssues: true) },
+                           searchIssues: { await session.searchMentionIssues($0) },
+                           slashCommands: { session.commentSlashCommands($0) },
+                           slashMode: .commands,
+                           renderSlashCommand: { [issueID = store.issueID] in try await session.renderSlashCommand($0, issueID: issueID) })
                 .opacity(submitting ? 0.6 : 1)
                 .padding(.horizontal, compact ? 0 : 8)
                 .padding(.top, compact ? 0 : 8)
@@ -160,7 +164,9 @@ struct IssueDetailComposer: View {
             switch state {
             case .idle: fallback = .start
             case .queued: fallback = .join
-            case .running(_, let steerable): fallback = steerable && !hasAttachments ? .steer : .afterRun
+            case .running(_, let steerable):
+                let steerByDefault = SettingsDevicePreferences.shared.runningAgentReply != .afterRun
+                fallback = steerable && steerByDefault && !hasAttachments ? .steer : .afterRun
             }
             var action = choices[agent.id] ?? fallback
             if action == .steer && hasAttachments { action = .afterRun }
@@ -172,7 +178,9 @@ struct IssueDetailComposer: View {
 
     private var attachmentsBlockSteer: Bool {
         hasAttachments && recipients.contains { r in
-            if case .running(_, let steerable) = r.state, steerable { return choices[r.id] == .steer || choices[r.id] == nil }
+            if case .running(_, let steerable) = r.state, steerable {
+                return choices[r.id] == .steer || (choices[r.id] == nil && SettingsDevicePreferences.shared.runningAgentReply != .afterRun)
+            }
             return false
         }
     }
