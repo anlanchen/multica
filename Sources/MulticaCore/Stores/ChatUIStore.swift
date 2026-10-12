@@ -52,6 +52,9 @@ public final class ChatUIStore {
 
     public private(set) var context = ChatUIContext()
     public private(set) var agentsByID: [String: AgentRecord] = [:]
+    /// Presence per agent (online / unstable / offline / archived); empty
+    /// until runtimes load.
+    public private(set) var availabilityByAgent: [String: String] = [:]
     public private(set) var historySessions: [ChatSession] = []
     public private(set) var archivedSessions: [ChatSession] = []
     public private(set) var pendingBySession: [String: PendingChatTaskItem] = [:]
@@ -101,6 +104,7 @@ public final class ChatUIStore {
         session.addEventTap { [weak self] event in self?.handle(event) }
         trackSessions()
         trackContext()
+        trackPresence()
     }
 
     enum Keys {
@@ -158,6 +162,22 @@ public final class ChatUIStore {
             context = next
         }
         selfHeal()
+    }
+
+    private func trackPresence() {
+        guard let s = session else { return }
+        let map = withObservationTracking { () -> [String: String] in
+            _ = presenceTick
+            guard s.runtimeRecords.isLoaded else { return [:] }
+            let runtimes = Dictionary(s.runtimeRecords.items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let now = Date()
+            var out: [String: String] = [:]
+            for a in s.agentRecords.items { out[a.id] = ChatUIAgents.availability(a, runtime: runtimes[a.runtimeId], now: now) }
+            return out
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.trackPresence() }
+        }
+        if map != availabilityByAgent { availabilityByAgent = map }
     }
 
     private func computeContext() -> ChatUIContext {

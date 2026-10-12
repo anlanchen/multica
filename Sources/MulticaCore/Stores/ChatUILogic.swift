@@ -542,6 +542,39 @@ public enum ChatUIText {
         elapsed(seconds: max(0, Int((Double(ms) / 1000).rounded())))
     }
 
+    /// One-line summary of a tool call's input (`traceToolArgSummary`).
+    public static func toolSummary(_ input: JSONValue?) -> String {
+        guard case .object(let o)? = input else { return "" }
+        func str(_ k: String) -> String { o[k]?.stringValue ?? "" }
+        func clip(_ s: String, _ max: Int) -> String { s.count > max ? String(s.prefix(max)) + "…" : s }
+        func short(_ p: String) -> String {
+            let parts = p.split(separator: "/", omittingEmptySubsequences: false)
+            return parts.count <= 3 ? p : ".../" + parts.suffix(2).joined(separator: "/")
+        }
+        if !str("query").isEmpty { return str("query") }
+        if !str("file_path").isEmpty { return short(str("file_path")) }
+        if !str("path").isEmpty { return short(str("path")) }
+        if !str("pattern").isEmpty { return str("pattern") }
+        if !str("description").isEmpty { return str("description") }
+        let command = str("command").isEmpty ? str("cmd") : str("command")
+        if !command.isEmpty { return clip(stripShellWrapper(command), 120) }
+        if !str("prompt").isEmpty { return clip(str("prompt"), 120) }
+        if !str("skill").isEmpty { return str("skill") }
+        for key in o.keys.sorted() {
+            if let v = o[key]?.stringValue, !v.isEmpty, v.count < 120 { return v }
+        }
+        return ""
+    }
+
+    /// `<shell> -lc '<cmd>'` → `<cmd>`.
+    static func stripShellWrapper(_ command: String) -> String {
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let re = try? NSRegularExpression(pattern: #"^(?:/[\w./-]*/)?(?:zsh|bash|sh|fish)\s+(?:-[a-z]+\s+)*(['"])([\s\S]+)\1$"#),
+              let m = re.firstMatch(in: trimmed, range: NSRange(location: 0, length: (trimmed as NSString).length)),
+              m.numberOfRanges > 2 else { return command }
+        return (trimmed as NSString).substring(with: m.range(at: 2))
+    }
+
     /// `isTaskMessageTaskId`: a real server task id (UUID).
     public static func isTaskID(_ id: String?) -> Bool {
         guard let id else { return false }

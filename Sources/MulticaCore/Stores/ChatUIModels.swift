@@ -136,6 +136,9 @@ public final class ChatUIConversation: Identifiable {
     public private(set) var messages: [ChatMessage] = []
     /// `messages` minus queued follow-ups (they render in the queue).
     public private(set) var visibleMessages: [ChatMessage] = []
+    /// Rows to draw: the onboarding kickoff carries Mika's first task and is
+    /// never shown as a member bubble.
+    public private(set) var renderMessages: [ChatMessage] = []
     public private(set) var messagesLoaded = false
     public private(set) var hasOlder = false
     public internal(set) var isFetchingOlder = false
@@ -223,7 +226,10 @@ public final class ChatUIConversation: Identifiable {
 
     private func recompute() {
         let visible = ChatUIPending.hideQueued(messages, pending: pending)
-        if visible != visibleMessages { visibleMessages = visible }
+        if visible != visibleMessages {
+            visibleMessages = visible
+            renderMessages = visible.filter { $0.messageKind != "onboarding_kickoff" }
+        }
         let latest = visible.last { $0.role == "assistant" && $0.taskId != nil }?.id
         if latest != latestAssistantMessageID { latestAssistantMessageID = latest }
         let starter = visible.first { $0.role == "assistant" && $0.messageKind == "onboarding_opening" }?.id

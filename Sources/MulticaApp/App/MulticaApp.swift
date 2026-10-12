@@ -119,6 +119,8 @@ struct AppShell: View {
                 FloatingChatPanel()
                     .padding(16)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                ChatUIFab().padding(16)
             }
         }
         .overlay(alignment: .bottomTrailing) { ToastOverlay() }
