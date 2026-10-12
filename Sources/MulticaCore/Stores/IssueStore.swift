@@ -91,6 +91,11 @@ public final class IssueStore {
     public private(set) var loadedCount = 0
     /// Number of times `sections` was recomputed (diagnostics).
     @ObservationIgnored public private(set) var resectionCount = 0
+    /// Bumped on every applied issue change; server-backed lists observe it
+    /// (outside `body`) to refetch membership and order.
+    public private(set) var changeRevision = 0
+    /// Bumped on every agent task snapshot/lifecycle change.
+    public private(set) var activityRevision = 0
 
     public var filter: IssueFilter = .all {
         didSet { if filter != oldValue { scheduleResection() } }
@@ -141,6 +146,7 @@ public final class IssueStore {
         }
         totalOnServer = total
         loadedCount = models.count
+        changeRevision &+= 1
         scheduleResection()
     }
 
@@ -148,7 +154,9 @@ public final class IssueStore {
     /// loaded yet), which is the only case that grows the server total.
     public func upsert(_ issue: Issue, isNew: Bool = false) {
         if let m = models[issue.id] {
+            let before = m.issue
             guard let change = m.update(issue) else { return }
+            if m.issue != before { changeRevision &+= 1 }
             if change.status || change.order || (change.assignee && filter != .all) || (change.text && !searchText.isEmpty) {
                 scheduleResection()
             }
@@ -158,6 +166,7 @@ public final class IssueStore {
             models[issue.id] = m
             loadedCount = models.count
             if isNew { totalOnServer += 1 }
+            changeRevision &+= 1
             scheduleResection()
         }
     }
@@ -168,17 +177,20 @@ public final class IssueStore {
         guard let m = models[id] else { return nil }
         let previous = m.issue
         m.forceSet(transform(previous))
+        changeRevision &+= 1
         scheduleResection()
         return previous
     }
 
     public func restore(_ issue: Issue) {
         models[issue.id]?.forceSet(issue)
+        changeRevision &+= 1
         scheduleResection()
     }
 
     public func remove(_ id: String) {
         guard models.removeValue(forKey: id) != nil else { return }
+        changeRevision &+= 1
         loadedCount = models.count
         totalOnServer = max(0, totalOnServer - 1)
         scheduleResection()
@@ -189,6 +201,7 @@ public final class IssueStore {
         var i = m.issue
         i.labels = labels
         m.forceSet(i)
+        changeRevision &+= 1
     }
 
     // MARK: Agent activity
@@ -205,6 +218,7 @@ public final class IssueStore {
             let n = activeTasks[id]?.count ?? 0
             if m.activeRuns != n { m.activeRuns = n }
         }
+        activityRevision &+= 1
         if filter == .running { scheduleResection() }
     }
 
@@ -219,6 +233,7 @@ public final class IssueStore {
             if activeTasks[e.issueID]?.isEmpty == true { activeTasks[e.issueID] = nil }
             taskIssue[e.taskID] = nil
         }
+        activityRevision &+= 1
         let n = activeTasks[e.issueID]?.count ?? 0
         if let m = models[e.issueID], m.activeRuns != n {
             m.activeRuns = n
