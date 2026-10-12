@@ -278,6 +278,59 @@ public enum SettingsSeatPurchase {
     }
 }
 
+/// Color math behind the settings color picker (upstream color-utils.ts).
+public enum SettingsColor {
+    /// The shared palette (labels, statuses, property options).
+    public static let presets = ["#6b7280", "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#3b82f6", "#6366f1", "#a855f7", "#ec4899"]
+    public static let defaultColor = presets[6]
+
+    /// Lowercase `#rrggbb`, or nil when not a 6-digit hex color.
+    public static func normalizeHex(_ input: String) -> String? {
+        var s = input.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, s.allSatisfy(\.isHexDigit) else { return nil }
+        return "#" + s.lowercased()
+    }
+
+    /// Hue in degrees for a chromatic color, nil for grays and black.
+    public static func hue(_ hex: String) -> Double? {
+        guard let n = normalizeHex(hex), let v = UInt32(n.dropFirst(), radix: 16) else { return nil }
+        let r = Double((v >> 16) & 0xFF) / 255, g = Double((v >> 8) & 0xFF) / 255, b = Double(v & 0xFF) / 255
+        let maxC = max(r, g, b), delta = maxC - min(r, g, b)
+        guard delta > 0, maxC > 0 else { return nil }
+        var h: Double
+        if maxC == r { h = (g - b) / delta } else if maxC == g { h = (b - r) / delta + 2 } else { h = (r - g) / delta + 4 }
+        h *= 60
+        return h < 0 ? h + 360 : h
+    }
+
+    public static func hslToHex(hue: Double, saturation: Double, lightness: Double) -> String {
+        func channel(_ n: Double) -> String {
+            let k = (n + hue / 30).truncatingRemainder(dividingBy: 12)
+            let a = saturation * min(lightness, 1 - lightness)
+            let value = lightness - a * max(-1, min(k - 3, 9 - k, 1))
+            return String(format: "%02x", Int((value * 255).rounded()))
+        }
+        return "#\(channel(0))\(channel(8))\(channel(4))"
+    }
+
+    /// A random vivid color, at least 40° of hue away from `avoid`.
+    public static func random(avoiding avoid: String? = nil, using rng: inout some RandomNumberGenerator) -> String {
+        let hue: Double
+        if let avoidHue = avoid.flatMap(Self.hue) {
+            hue = (avoidHue + 40 + Double.random(in: 0..<(360 - 80), using: &rng)).truncatingRemainder(dividingBy: 360)
+        } else {
+            hue = Double.random(in: 0..<360, using: &rng)
+        }
+        return hslToHex(hue: hue, saturation: Double.random(in: 0.62...0.9, using: &rng), lightness: Double.random(in: 0.46...0.62, using: &rng))
+    }
+
+    public static func random(avoiding avoid: String? = nil) -> String {
+        var rng = SystemRandomNumberGenerator()
+        return random(avoiding: avoid, using: &rng)
+    }
+}
+
 /// Pure helpers behind individual settings pages.
 public enum SettingsRules {
     /// Server cap on the profile "About you" text.

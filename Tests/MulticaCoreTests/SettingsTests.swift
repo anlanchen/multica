@@ -220,6 +220,24 @@ final class SettingsRulesTests: XCTestCase {
         XCTAssertNil(SettingsRules.normalizeCategory("weird"))
     }
 
+    func testColorHelpers() {
+        XCTAssertEqual(SettingsColor.normalizeHex(" #ABCDEF "), "#abcdef")
+        XCTAssertEqual(SettingsColor.normalizeHex("3b82f6"), "#3b82f6")
+        XCTAssertNil(SettingsColor.normalizeHex("#abc"))
+        XCTAssertNil(SettingsColor.normalizeHex("#gggggg"))
+        XCTAssertEqual(SettingsColor.hue("#ff0000"), 0)
+        XCTAssertEqual(SettingsColor.hue("#00ff00"), 120)
+        XCTAssertNil(SettingsColor.hue("#808080"))
+        XCTAssertEqual(SettingsColor.hslToHex(hue: 0, saturation: 1, lightness: 0.5), "#ff0000")
+        XCTAssertEqual(SettingsColor.hslToHex(hue: 240, saturation: 1, lightness: 0.5), "#0000ff")
+        for _ in 0..<50 {
+            let c = SettingsColor.random(avoiding: "#ff0000")
+            XCTAssertNotNil(SettingsColor.normalizeHex(c))
+            let h = SettingsColor.hue(c) ?? 0
+            XCTAssertGreaterThanOrEqual(min(h, 360 - h), 38, c)
+        }
+    }
+
     func testSettingsAPIErrorReadsCodeAndIssueCount() {
         let body = Data(#"{"error":"in use","code":"status_in_use","issue_count":3}"#.utf8)
         let e = SettingsAPIError.from(status: 409, data: body)
