@@ -11,6 +11,23 @@ public struct StatusCategory: OpenEnum, Comparable {
     public static let done = StatusCategory(rawValue: "done")
     public static let closed = StatusCategory(rawValue: "closed")
 
+    /// Upstream `normalizeIssueStatusCategory`: servers also send the
+    /// seven-value form (a built-in key as its own category) and the interim
+    /// `completed` / `canceled` values.
+    public static func normalized(_ raw: String) -> StatusCategory {
+        switch raw {
+        case "completed": return .done
+        case "canceled": return .closed
+        case "unstarted", "started", "done", "closed": return StatusCategory(rawValue: raw)
+        default: return IssueStatusKey(rawValue: raw).builtInCategory ?? StatusCategory(rawValue: raw)
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        self = Self.normalized((try? c.decode(String.self)) ?? "")
+    }
+
     var order: Int {
         switch self {
         case .unstarted: return 0

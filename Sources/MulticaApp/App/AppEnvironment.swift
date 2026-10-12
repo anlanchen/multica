@@ -251,6 +251,7 @@ final class AppEnvironment {
     /// `multica://` links: auth callback, or a workspace path such as
     /// `multica://open/acme/issues/<id>` opened in a tab.
     func handleOpenURL(_ url: URL) async {
+        if await DebugAutomation.handle(url, env: self) { return }
         if url.host == "auth" {
             await app.handleDeepLink(url)
             return

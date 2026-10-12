@@ -59,6 +59,20 @@ final class RichContentTests: XCTestCase {
         XCTAssertNil(MarkdownBlocks.fileCard("!file[x](javascript:alert(1))"))
     }
 
+    func testRawHTML() {
+        XCTAssertEqual(MarkdownPreprocess.rawHTML("a <!-- workflow:start --> b"), "a  b")
+        XCTAssertEqual(MarkdownPreprocess.rawHTML("x<br>y<BR/>z"), "x\ny\nz")
+        XCTAssertEqual(MarkdownPreprocess.rawHTML("`<!-- kept -->`"), "`<!-- kept -->`")
+    }
+
+    func testStatusCategoryNormalization() throws {
+        let json = #"[{"key":"in_progress","name":"","category":"in_progress"},{"key":"x","name":"X","category":"completed"},{"key":"y","name":"Y","category":"started"}]"#
+        let entries = try JSONCoders.decoder.decode([IssueStatusEntry].self, from: Data(json.utf8))
+        XCTAssertEqual(entries.map(\.category), [.started, .done, .started])
+        XCTAssertEqual(StatusCategory.normalized("canceled"), .closed)
+        XCTAssertEqual(StatusCategory.normalized("backlog"), .unstarted)
+    }
+
     func testCachedParseAppliesPreprocessing() {
         let blocks = MarkdownBlocks.cachedParse("fix MUL-9 per https://a.com")
         XCTAssertEqual(blocks, [.paragraph("fix [MUL-9](mention://issue/MUL-9) per [https://a.com](https://a.com)")])

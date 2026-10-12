@@ -8,6 +8,7 @@ public enum MarkdownPreprocess {
     public static func apply(_ markdown: String, autolinkIssueIdentifiers: Bool = true) -> String {
         guard !markdown.isEmpty else { return "" }
         var s = stripChannelMediaMarkers(markdown)
+        s = rawHTML(s)
         s = mentionShortcodes(s)
         if autolinkIssueIdentifiers { s = issueIdentifiers(s) }
         return links(s)
@@ -23,6 +24,7 @@ public enum MarkdownPreprocess {
         let shortcode = try! NSRegularExpression(pattern: "\\[@\\s+([^\\]]*)\\]")
         let attribute = try! NSRegularExpression(pattern: "(\\w+)=\"([^\"]*)\"")
         let channelMedia = try! NSRegularExpression(pattern: "<!-- multica:channel-media:[0-9a-fA-F-]{36} -->")
+        let htmlComment = try! NSRegularExpression(pattern: "<!--[\\s\\S]*?-->|<br\\s*/?>", options: [.caseInsensitive])
         let url = try! NSRegularExpression(pattern: "(?:https?://|www\\.)[^\\s<>\"'`\\]]+", options: [.caseInsensitive])
         let email = try! NSRegularExpression(pattern: "(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}(?![A-Za-z0-9])")
     }
@@ -42,6 +44,24 @@ public enum MarkdownPreprocess {
         guard s.contains("<!-- multica:channel-media:") else { return s }
         let ns = s as NSString
         return p.channelMedia.stringByReplacingMatches(in: s, range: NSRange(location: 0, length: ns.length), withTemplate: "")
+    }
+
+    /// Raw HTML the upstream sanitizer handles: comments are dropped and
+    /// `<br>` becomes a line break (outside code).
+    public static func rawHTML(_ s: String) -> String {
+        guard s.contains("<!--") || s.range(of: "<br", options: .caseInsensitive) != nil else { return s }
+        let ns = s as NSString
+        let code = codeRanges(s)
+        var out = ""
+        var last = 0
+        for m in p.htmlComment.matches(in: s, range: NSRange(location: 0, length: ns.length)) {
+            if inside(m.range.location, code) { continue }
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            out += ns.substring(with: m.range).lowercased().hasPrefix("<br") ? "\n" : ""
+            last = m.range.location + m.range.length
+        }
+        guard last > 0 else { return s }
+        return out + ns.substring(from: last)
     }
 
     /// `[@ id="…" label="…"]` → `[@label](mention://member/id)`.
