@@ -110,6 +110,38 @@ public struct SkillsLocalInventory: Sendable, Hashable {
     }
 }
 
+/// Case-insensitive match segments for search highlighting (upstream
+/// HighlightText: the whole query, plus each word when there are several).
+public enum SkillsTextHighlight {
+    public struct Segment: Sendable, Hashable {
+        public var text: String
+        public var highlighted: Bool
+    }
+
+    public static func segments(_ text: String, query: String) -> [Segment] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !text.isEmpty else { return [Segment(text: text, highlighted: false)] }
+        var terms = [q]
+        for word in q.split(whereSeparator: \.isWhitespace).map(String.init) where !terms.contains(word) { terms.append(word) }
+        var out: [Segment] = []
+        var cursor = text.startIndex
+        var plainStart = text.startIndex
+        while cursor < text.endIndex {
+            if let term = terms.first(where: { text[cursor...].range(of: $0, options: [.caseInsensitive, .anchored]) != nil }),
+               let r = text[cursor...].range(of: term, options: [.caseInsensitive, .anchored]), !r.isEmpty {
+                if plainStart < cursor { out.append(Segment(text: String(text[plainStart..<cursor]), highlighted: false)) }
+                out.append(Segment(text: String(text[r]), highlighted: true))
+                cursor = r.upperBound
+                plainStart = cursor
+            } else {
+                cursor = text.index(after: cursor)
+            }
+        }
+        if plainStart < text.endIndex { out.append(Segment(text: String(text[plainStart...]), highlighted: false)) }
+        return out.isEmpty ? [Segment(text: text, highlighted: false)] : out
+    }
+}
+
 public enum SkillsLocalImportOutcome: Sendable, Hashable {
     case created(Skill)
     case updated(Skill)

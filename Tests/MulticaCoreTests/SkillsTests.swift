@@ -334,4 +334,12 @@ final class SkillsRuntimeTests: XCTestCase {
         XCTAssertFalse(SkillsConflictResolution(action: .overwrite, renameName: "").isApplicable(canOverwrite: false))
         XCTAssertFalse(SkillsConflictResolution(action: .rename, renameName: " ").isApplicable(canOverwrite: true))
     }
+
+    func testHighlightSegments() {
+        let s = SkillsTextHighlight.segments("Read PDF files", query: "pdf")
+        XCTAssertEqual(s.map(\.text), ["Read ", "PDF", " files"])
+        XCTAssertEqual(s.map(\.highlighted), [false, true, false])
+        XCTAssertEqual(SkillsTextHighlight.segments("a b", query: "").count, 1)
+        XCTAssertEqual(SkillsTextHighlight.segments("read the files", query: "files read").filter(\.highlighted).map(\.text), ["read", "files"])
+    }
 }
