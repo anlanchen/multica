@@ -60,7 +60,6 @@ struct ChatUIFloatingWindow: View {
                 Button { shell.chatOpen = false } label: { ChatUIIconLabel(systemName: "minus") }
                     .buttonStyle(.plain)
                     .help(tr("chat", "window.minimize_tooltip"))
-                    .keyboardShortcut(.cancelAction)
             }
         }
         .padding(.horizontal, 12)
@@ -413,8 +412,8 @@ struct ChatUIFab: View {
     private func mounted(_ store: ChatUIStore) {
         if !Self.restored {
             Self.restored = true
-            if store.openPreference && store.floatingEnabled && nav.route != .chat {
-                shell.chatOpen = true
+            if store.openPreference && store.floatingEnabled {
+                if nav.route != .chat { shell.chatOpen = true }
                 return
             }
         }

@@ -212,30 +212,45 @@ struct ChatUIMessageRow: View, Equatable {
 }
 
 struct ChatUIUserBubble: View {
+    @Environment(Navigator.self) private var nav
     let message: ChatMessage
     @State private var inline: AttributedString?
     @State private var blocks = false
 
     var body: some View {
+        let text = ChatUIText.displayMarkdown(message.content, attachments: message.attachments)
         HStack(alignment: .top, spacing: 0) {
             Spacer(minLength: 56)
             VStack(alignment: .leading, spacing: 6) {
                 if blocks {
-                    ChatUIRichText(source: message.content)
-                } else {
-                    Text(inline ?? AttributedString(message.content))
+                    ChatUIRichText(source: text)
+                } else if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(inline ?? AttributedString(text))
                         .font(Theme.Font.body)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
+                        .environment(\.openURL, OpenURLAction { url in
+                            guard url.scheme == "mention" else { return .systemAction }
+                            let id = url.pathComponents.dropFirst().first ?? ""
+                            switch url.host() ?? "" {
+                            case "issue": nav.push(.issue(id))
+                            case "project": nav.push(.project(id))
+                            case "agent": nav.push(.agent(id))
+                            case "member": nav.push(.member(id))
+                            case "squad": nav.push(.squad(id))
+                            default: return .discarded
+                            }
+                            return .handled
+                        })
                 }
-                ChatUIAttachmentList(attachments: message.attachments, content: message.content)
+                ChatUIAttachmentList(attachments: message.attachments, content: text)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.primary.opacity(0.06)))
         }
         .task(id: message.content) {
-            let source = message.content
+            let source = ChatUIText.displayMarkdown(message.content, attachments: message.attachments)
             let parsed = await Task.detached(priority: .userInitiated) { MarkdownBlocks.cachedParse(source) }.value
             if parsed.count == 1, case .paragraph = parsed[0] {
                 inline = await MarkdownCache.shared.render(source)
@@ -284,7 +299,7 @@ struct ChatUIAssistantTurn: View {
     @ViewBuilder
     private func content(store: ChatUIStore, timeline: ChatUITaskTimeline?) -> some View {
         let isNoResponse = message?.messageKind == "no_response"
-        let settled = message.map(ChatUITimeline.canonicalAnswer)
+        let settled = message.map { ChatUIText.displayMarkdown(ChatUITimeline.canonicalAnswer($0), attachments: $0.attachments) }
         let canonical = !isNoResponse && !(settled ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? settled : nil
         let hasTimeline = !(timeline?.items.isEmpty ?? true)
         VStack(alignment: .leading, spacing: 6) {
@@ -400,7 +415,7 @@ struct ChatUITimelineRow: View, Equatable {
     var body: some View {
         switch item.kind {
         case .text:
-            ChatUIRichText(source: ChatUITimeline.stripQuickActionsProtocol(item.content), font: Theme.Font.caption)
+            ChatUIRichText(source: ChatUIText.displayMarkdown(ChatUITimeline.stripQuickActionsProtocol(item.content), attachments: nil), font: Theme.Font.caption)
                 .foregroundStyle(.secondary)
                 .padding(.vertical, 2)
         case .toolUse:

@@ -246,6 +246,10 @@ final class ChatUIRulesTests: XCTestCase {
         let inline = Attachment(id: "a1", markdownUrl: "/api/attachments/a1/file")
         let card = Attachment(id: "a2", markdownUrl: "/api/attachments/a2/file")
         XCTAssertEqual(ChatUIText.standaloneAttachments([inline, card, card], content: "![x](/api/attachments/a1/file)").map(\.id), ["a2"])
+        let source = "See !file[report \\[v2\\].pdf](/api/attachments/a2/file) and !file[gone.txt](/x/y)"
+        let display = ChatUIText.displayMarkdown(source, attachments: [card])
+        XCTAssertEqual(display, "See  and 📎 gone.txt")
+        XCTAssertEqual(ChatUIText.standaloneAttachments([card], content: display).map(\.id), ["a2"], "a lifted file card renders as an attachment card")
     }
 
     func testSessionOrderingAndUnread() {

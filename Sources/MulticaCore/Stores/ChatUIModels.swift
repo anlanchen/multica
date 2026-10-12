@@ -291,8 +291,8 @@ public final class ChatUITaskTimeline: Identifiable {
         preface = parts.preface
         middle = parts.middle
         final = parts.final
-        prefaceText = ChatUITimeline.stripQuickActionsProtocol(parts.preface.map(\.content).joined())
-        finalText = ChatUITimeline.stripQuickActionsProtocol(parts.final.map(\.content).joined())
+        prefaceText = ChatUIText.displayMarkdown(ChatUITimeline.stripQuickActionsProtocol(parts.preface.map(\.content).joined()), attachments: nil)
+        finalText = ChatUIText.displayMarkdown(ChatUITimeline.stripQuickActionsProtocol(parts.final.map(\.content).joined()), attachments: nil)
         hasMessages = !source.isEmpty
         if let latest = source.last(where: { $0.kind != .error && $0.kind != .toolResult }) {
             latestKind = latest.kind

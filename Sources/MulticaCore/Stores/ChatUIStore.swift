@@ -807,8 +807,8 @@ public final class ChatUIStore {
         if let draftKey {
             let live = drafts[draftKey]
             if live == nil || live == snapshot { clearDraft(draftKey) }
+            if draftKey != sessionID { clearDraft(sessionID) }
         }
-        if draftKey != sessionID { clearDraft(sessionID) }
 
         if c.stopRequestedBeforeTask {
             c.stopRequestedBeforeTask = false

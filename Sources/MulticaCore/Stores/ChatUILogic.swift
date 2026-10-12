@@ -590,6 +590,29 @@ public enum ChatUIText {
         referenceURLs(a).contains { content.contains($0) }
     }
 
+    /// Markdown ready for the native renderer: `!file[name](url)` cards whose
+    /// file is attached are lifted out (they render as attachment cards), any
+    /// other file card becomes a plain "📎 name".
+    public static func displayMarkdown(_ content: String, attachments: [Attachment]?) -> String {
+        guard content.contains("!file["),
+              let re = try? NSRegularExpression(pattern: #"!file\[((?:\\.|[^\]\\])*)\]\(([^)\s]+)\)"#) else { return content }
+        let ns = content as NSString
+        var out = ""
+        var cursor = 0
+        for m in re.matches(in: content, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor))
+            let url = ns.substring(with: m.range(at: 2))
+            let attached = (attachments ?? []).contains { referenceURLs($0).contains(url) }
+            if !attached {
+                let label = ns.substring(with: m.range(at: 1)).replacingOccurrences(of: #"\\([\[\]\\()])"#, with: "$1", options: .regularExpression)
+                out += "📎 \(label)"
+            }
+            cursor = m.range.location + m.range.length
+        }
+        out += ns.substring(from: cursor)
+        return out
+    }
+
     /// Attachments to render as cards: the ones the markdown does not already
     /// show inline (`selectStandaloneAttachments`), deduplicated.
     public static func standaloneAttachments(_ attachments: [Attachment]?, content: String) -> [Attachment] {
