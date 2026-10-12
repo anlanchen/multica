@@ -541,6 +541,11 @@ struct IssueDetailCommentView: View {
                     }
                     Divider()
                     Button {
+                        let root = store.layout.replyToRoot[entry.id] ?? entry.id
+                        store.collapsedThreads.remove(root)
+                        store.quote(entry.content ?? "", into: "reply:\(store.issueID):\(root)")
+                    } label: { Label(tr("issues", "reply.annotations.add"), systemImage: "text.quote") }
+                    Button {
                         IssueDetailFiles.copy(entry.content ?? "")
                         toaster.success(tr("issues", "comment.copied_toast"))
                     } label: { Label(tr("issues", "comment.copy_action"), systemImage: "doc.on.doc") }

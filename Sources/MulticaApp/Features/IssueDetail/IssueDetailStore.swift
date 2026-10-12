@@ -30,6 +30,8 @@ final class IssueDetailStore {
     private(set) var tasks: [AgentTaskRecord] = []
     private(set) var tasksLoaded = false
     private(set) var layout = IssueDetailTimelineLayout()
+    /// Files the comments delivered, newest first.
+    private(set) var deliverables: [IssueDetailDeliverable] = []
     /// nil until the subscriber list is known (upstream gates every
     /// subscription control on it).
     private(set) var subscribers: [IssueSubscriber]?
@@ -68,6 +70,8 @@ final class IssueDetailStore {
     /// Row the timeline should scroll to (consumed by the scroll reader).
     var scrollRequest: (id: String, token: Int)?
     var selectedChildren: Set<String> = []
+    /// Bumped when a draft is changed from outside its composer.
+    var draftBumps: [String: Int] = [:]
 
     @ObservationIgnored private var isOpen = false
     @ObservationIgnored private var taskRefetch: Task<Void, Never>?
@@ -88,6 +92,11 @@ final class IssueDetailStore {
         rebuildLayout()
     }
 
+    /// The issue disappeared from the shared store (deleted elsewhere).
+    func markDeleted() {
+        notFound = true
+    }
+
     func close() {
         guard isOpen else { return }
         isOpen = false
@@ -106,6 +115,13 @@ final class IssueDetailStore {
 
     var issueModel: IssueModel? { model.issue ?? session.issues.model(issueID) }
     var issue: Issue? { issueModel?.issue }
+
+    /// The parent, once loaded into the shared store (reads the observed
+    /// sibling list so views refresh when the parent arrives).
+    var parentIssue: Issue? {
+        _ = parentChildren
+        return issue?.parentIssueID.flatMap { session.issues.model($0)?.issue }
+    }
 
     var currentUserID: String { session.currentUser.id }
 
@@ -271,7 +287,17 @@ final class IssueDetailStore {
             guard let self else { return }
             self.layoutPending = false
             let next = IssueDetailTimelineLayout.build(entries: self.model.entries, tasks: self.tasks)
-            if next != self.layout { self.layout = next }
+            guard next != self.layout else { return }
+            self.layout = next
+            var files: [IssueDetailDeliverable] = []
+            for item in next.items {
+                guard let thread = item.thread else { continue }
+                for e in [thread.root] + thread.replies where !e.isDeletedComment {
+                    for a in e.attachments { files.append(IssueDetailDeliverable(attachment: a, commentID: e.id)) }
+                }
+            }
+            files.sort { $0.attachment.createdAt > $1.attachment.createdAt }
+            if files != self.deliverables { self.deliverables = files }
         }
     }
 
@@ -641,6 +667,11 @@ final class IssueDetailStore {
             await session.pins.load()
         }
     }
+}
+
+struct IssueDetailDeliverable: Hashable {
+    var attachment: Attachment
+    var commentID: String
 }
 
 enum IssueDetailReactionFactory {

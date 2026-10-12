@@ -253,8 +253,6 @@ private struct IssueDetailRunSummary: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onAppear { if task.status == "running" { session.watchTranscript(transcript) } }
-            .onDisappear { if task.status == "running" { session.unwatchTranscript(transcript) } }
     }
 
     private func summary(_ t: TranscriptModel) -> String {
@@ -315,8 +313,7 @@ struct IssueDetailRunSteps: View {
             .padding(.vertical, 4)
         }
         .padding(.top, 6)
-        .onAppear { session.watchTranscript(transcript) }
-        .onDisappear { session.unwatchTranscript(transcript) }
+        .task { if transcript.buffer.isEmpty { await session.backfill(transcript) } }
     }
 }
 

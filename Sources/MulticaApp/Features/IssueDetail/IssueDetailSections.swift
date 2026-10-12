@@ -419,7 +419,7 @@ struct IssueDetailDeliverablesSection: View {
     @State private var overview = false
 
     var body: some View {
-        let files = deliverables
+        let files = store.deliverables
         if !files.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 IssueDetailSectionHeader(title: tr("issues", "deliverables.section_title"), open: $open) {
@@ -444,22 +444,6 @@ struct IssueDetailDeliverablesSection: View {
             .sheet(isPresented: $overview) { IssueDetailDeliverablesOverview(store: store, files: files) }
         }
     }
-
-    struct File: Hashable {
-        var attachment: Attachment
-        var commentID: String
-    }
-
-    private var deliverables: [File] {
-        var out: [File] = []
-        for item in store.layout.items {
-            guard let thread = item.thread else { continue }
-            for e in [thread.root] + thread.replies where !e.isDeletedComment {
-                for a in e.attachments { out.append(File(attachment: a, commentID: e.id)) }
-            }
-        }
-        return out.sorted { $0.attachment.createdAt > $1.attachment.createdAt }
-    }
 }
 
 /// Upstream DeliverablesOverview: every delivered file with a type filter
@@ -468,7 +452,7 @@ private struct IssueDetailDeliverablesOverview: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(Navigator.self) private var nav
     let store: IssueDetailStore
-    let files: [IssueDetailDeliverablesSection.File]
+    let files: [IssueDetailDeliverable]
     @State private var filter = "all"
 
     var body: some View {

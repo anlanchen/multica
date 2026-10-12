@@ -14,7 +14,7 @@ struct IssueDetailPage: View {
 
     var body: some View {
         Group {
-            if let store, !(store.notFound && store.issue == nil) {
+            if let store, !store.notFound {
                 IssueDetailScreen(store: store)
             } else if notFound || store?.notFound == true {
                 IssueDetailNotFound()
@@ -142,6 +142,7 @@ struct IssueDetailScreen: View {
     @State private var findMatches: [IssueDetailFindMatch] = []
     @State private var dragStart: Double?
     @State private var runConfirm: IssueDetailRunGate?
+    @State private var consumedHighlight: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -174,6 +175,19 @@ struct IssueDetailScreen: View {
             findOpen = true
         }
         .onChange(of: store.issue?.revision) { store.issueRevisionChanged() }
+        .onChange(of: session.issues.model(store.issueID) == nil) { _, gone in if gone && store.record != nil { store.markDeleted() } }
+        .task(id: session.issues.loadedCount) {
+            guard store.children != nil else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await store.loadChildren()
+        }
+        .task(id: store.layout.items.count) {
+            guard let target = nav.query("comment"), consumedHighlight != target,
+                  store.layout.items.contains(where: { $0.thread?.root.id == target || store.layout.replyToRoot[target] != nil }) else { return }
+            consumedHighlight = target
+            store.jump(to: target)
+        }
         .onChange(of: findQuery) {
             findIndex = 0
             recomputeMatches()

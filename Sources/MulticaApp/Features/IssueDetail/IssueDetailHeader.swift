@@ -78,7 +78,7 @@ struct IssueDetailHeader: View {
     @ViewBuilder private var breadcrumb: some View {
         if let issue = store.issue {
             HStack(spacing: 6) {
-                if let parentID = issue.parentIssueID, let parent = session.issues.model(parentID)?.issue {
+                if let parent = store.parentIssue {
                     Button(parent.identifier) { nav.push(.issue(parent.id), title: parent.identifier) }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
@@ -398,7 +398,12 @@ struct IssueDetailWakeupChip: View {
                 .help(primary.label + " · " + tr("issues", "wakeups.wait.open"))
             }
         }
-        .task(id: session.revision("issue_wakeup") &+ session.revision("wakeup")) { await store.loadWakeups() }
+        .task {
+            while !Task.isCancelled {
+                await store.loadWakeups()
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
     }
 
     private var primary: (label: String, count: Int, paused: Bool)? {

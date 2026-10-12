@@ -3,6 +3,16 @@ import MulticaCore
 import SwiftUI
 
 extension IssueDetailStore {
+    /// Quotes source text into a composer draft (upstream annotations: "Add
+    /// to reply" / "Add to comment"); mounted composers reload on the bump.
+    func quote(_ markdown: String, into draftKey: String) {
+        let body = markdown.count > 1200 ? String(markdown.prefix(1200)) + "…" : markdown
+        let quoted = body.split(separator: "\n", omittingEmptySubsequences: false).map { "> " + $0 }.joined(separator: "\n")
+        let existing = IssueDetailSessionState.drafts[draftKey] ?? ""
+        IssueDetailSessionState.drafts[draftKey] = (existing.isEmpty ? "" : existing + "\n\n") + quoted + "\n\n"
+        draftBumps[draftKey, default: 0] += 1
+    }
+
     /// Scrolls a freshly posted comment into view (no flash, like upstream).
     func reveal(_ commentID: String) {
         let root = layout.replyToRoot[commentID] ?? commentID
@@ -96,6 +106,7 @@ struct IssueDetailComposer: View {
             if !compact { RoundedRectangle(cornerRadius: Theme.Radius.large).strokeBorder(Theme.border) }
         }
         .onAppear { text = IssueDetailSessionState.drafts[draftKey] ?? "" }
+        .onChange(of: store.draftBumps[draftKey]) { text = IssueDetailSessionState.drafts[draftKey] ?? text }
         .onChange(of: text) {
             if text.isEmpty { IssueDetailSessionState.drafts[draftKey] = nil } else { IssueDetailSessionState.drafts[draftKey] = text }
             schedulePreview()
@@ -337,7 +348,7 @@ struct IssueDetailReplyBox: View {
     private var draftKey: String { "reply:\(store.issueID):\(rootID)" }
 
     var body: some View {
-        if active || IssueDetailSessionState.drafts[draftKey] != nil {
+        if active || store.draftBumps[draftKey] != nil || IssueDetailSessionState.drafts[draftKey] != nil {
             HStack(alignment: .top, spacing: 8) {
                 ActorAvatar(type: "member", id: store.currentUserID, size: 22)
                 IssueDetailComposer(store: store, parentID: rootID, draftKey: draftKey, maxEditorHeight: 300, compact: true, autofocus: active)

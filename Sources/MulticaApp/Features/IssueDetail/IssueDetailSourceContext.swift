@@ -13,7 +13,7 @@ struct IssueDetailSourceContextBadge: View {
 
     var body: some View {
         let snapshot = context.snapshot
-        let parent = store.issue?.parentIssueID.flatMap { session.issues.model($0)?.issue }
+        let parent = store.parentIssue
         let identifier = parent?.identifier ?? snapshot?.sourceIssue?.identifier ?? ""
         let title = parent?.title ?? snapshot?.sourceIssue?.title ?? ""
         HStack(spacing: 8) {

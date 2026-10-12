@@ -23,7 +23,7 @@ struct IssueDetailSidebar: View {
                     }
                     IssueDetailQuickActions(store: store)
                     IssueDetailWakeupsSection(store: store, issue: issue)
-                    if let parentID = issue.parentIssueID, let parent = session.issues.model(parentID)?.issue {
+                    if let parent = store.parentIssue {
                         VStack(alignment: .leading, spacing: 0) {
                             IssueDetailSectionHeader(title: tr("issues", "detail.section_parent_issue"), open: $parentOpen)
                             if parentOpen { IssueDetailParentRow(store: store, parent: parent).padding(.leading, 8) }
