@@ -15,13 +15,13 @@ import Foundation
 /// Any deviation — different key order, escapes in an id, a nested value
 /// before both ids — returns nil and the caller falls back to the full
 /// decoder, so the fast path can only skip work, never change a result.
-enum FastRouting {
+public enum FastRouting {
     private static let suffix = Array(#""type":"task:message"}"#.utf8)
     private static let payloadKey = Array("payload".utf8)
     private static let taskKey = Array("task_id".utf8)
     private static let issueKey = Array("issue_id".utf8)
 
-    static func taskMessageKeys(_ data: Data) -> (taskID: String, issueID: String?)? {
+    public static func taskMessageKeys(_ data: Data) -> (taskID: String, issueID: String?)? {
         data.withUnsafeBytes { raw -> (String, String?)? in
             let b = raw.bindMemory(to: UInt8.self)
             return scan(b)

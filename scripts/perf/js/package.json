@@ -1,0 +1,28 @@
+{
+  "name": "multica-perf-js",
+  "private": true,
+  "type": "module",
+  "description": "Runs upstream Multica's own hot-path code (bundled from the upstream checkout) in V8 on the fixtures multica-bench dumps.",
+  "scripts": {
+    "build": "node build.mjs",
+    "bench": "node --expose-gc bench.mjs"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0",
+    "linkify-it": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "unist-util-visit": "^5.0.0",
+    "rehype-katex": "^7.0.1",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-breaks": "^4.0.0",
+    "remark-cjk-friendly": "^2.3.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.0",
+    "unified": "^11.0.5"
+  }
+}

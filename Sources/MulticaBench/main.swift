@@ -34,6 +34,21 @@ func us(_ d: Duration, per n: Int) -> String {
 var report: [String] = []
 @MainActor func row(_ cells: String...) { report.append("| " + cells.joined(separator: " | ") + " |") }
 
+/// `--dump <dir>` writes each scenario's input so scripts/perf/js-bench.mjs
+/// can run upstream's JavaScript on byte-identical data.
+let dumpDir: URL? = {
+    let a = CommandLine.arguments
+    guard let i = a.firstIndex(of: "--dump"), i + 1 < a.count else { return nil }
+    let url = URL(fileURLWithPath: a[i + 1], isDirectory: true)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+}()
+
+func dump(_ name: String, _ lines: [String]) {
+    guard let dumpDir else { return }
+    try! lines.joined(separator: "\n").write(to: dumpDir.appendingPathComponent(name), atomically: true, encoding: .utf8)
+}
+
 // MARK: - Fixture
 
 func jsonString(_ s: String) -> String {
@@ -77,6 +92,7 @@ do {
     }
     frames.shuffle()
     let bytes = frames.reduce(0) { $0 + $1.count }
+    dump("fanout.jsonl", frames.map { String(decoding: $0, as: UTF8.self) })
 
     struct Envelope: Decodable { var type: String; var payload: TaskMessage }
     let decoder = JSONDecoder()
@@ -99,6 +115,15 @@ do {
     }
     let (decoderOnly, decoderKept) = routed(fastPath: false)
     let (fast, fastKept) = routed(fastPath: true)
+    let routingInterest = InterestRegistry()
+    routingInterest.retainTask("task-0")
+    var wanted = 0
+    let decision = measure(5) {
+        wanted = 0
+        for f in frames {
+            if let k = FastRouting.taskMessageKeys(f), routingInterest.wants(taskID: k.taskID, issueID: k.issueID) { wanted += 1 }
+        }
+    }
 
     report.append("### 1. `task:message` fan-out — \(frames.count) frames from \(runs) concurrent runs, \(bytes / 1024) KiB, 1 run on screen")
     report.append("")
@@ -107,6 +132,7 @@ do {
     row("Decode every frame (upstream before MUL-6396)", ms(full), us(full, per: frames.count), "\(kept)")
     row("Decode routing keys, skip body (single-pass decoder)", ms(decoderOnly), us(decoderOnly, per: frames.count), "\(decoderKept)")
     row("Byte-level prefix scan + decoder fallback (this client)", ms(fast), us(fast, per: frames.count), "\(fastKept)")
+    row("… of which the keep/drop decision (byte scan only)", ms(decision), us(decision, per: frames.count), "\(wanted)")
     report.append("")
 }
 
@@ -115,7 +141,9 @@ do {
 do {
     let total = 3000
     let flushSize = 10
-    let messages: [TaskMessage] = makeFrames(task: "t", issue: "i", count: total).map {
+    let rawFrames = makeFrames(task: "t", issue: "i", count: total)
+    dump("transcript.jsonl", rawFrames)
+    let messages: [TaskMessage] = rawFrames.map {
         struct Envelope: Decodable { var payload: TaskMessage }
         return try! JSONDecoder().decode(Envelope.self, from: Data($0.utf8)).payload
     }
@@ -246,6 +274,7 @@ await MainActor.run {
 
 do {
     let stamps = (0..<100_000).map { k in String(format: "2026-09-%02dT%02d:%02d:%02d.%03dZ", 1 + k % 28, k % 24, k % 60, (k / 7) % 60, k % 1000) }
+    dump("timestamps.txt", stamps)
     let iso = ISO8601DateFormatter()
     iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     var a = 0.0, b = 0.0
@@ -260,6 +289,73 @@ do {
     row("ISO8601DateFormatter", ms(foundation), us(foundation, per: stamps.count))
     row("Timestamp.parse (this client)", ms(fast), us(fast, per: stamps.count))
     report.append("")
+}
+
+// MARK: 5. Markdown
+
+do {
+    func doc(_ k: Int) -> String {
+        """
+        ## Plan for MUL-\(k)
+
+        I looked at the failing test in `Sources/App/Handler\(k).swift` and the root cause is the cache key. See https://github.com/acme/repo/pull/\(k) and MUL-\(k + 1).
+
+        - [x] Reproduce locally with **debug logging**
+        - [ ] Add the workspace id to the key, cc [@Ada](mention://member/u\(k))
+        - Keep the _old_ path behind a flag until MUL-\(k + 2) lands
+
+        | Step | Owner | ETA |
+        | --- | --- | --- |
+        | Fix | agent | today |
+        | Review | Ada | tomorrow |
+
+        ```swift
+        let key = "\\(workspace.id):\\(issue.id)"
+        cache[key] = value // \(k)
+        ```
+
+        > Note: the old behaviour stays available via `MULTICA_LEGACY_CACHE=1`.
+
+        !file[trace-\(k).log](/api/attachments/123e4567-e89b-12d3-a456-4266141740\(String(format: "%02d", k % 100))/download)
+        """
+    }
+    let docs = (0..<500).map(doc)
+    dump("markdown.jsonl", docs.map(jsonString))
+    var blocks = 0
+    let parse = measure(5) {
+        blocks = 0
+        for d in docs { blocks += MarkdownBlocks.parse(MarkdownPreprocess.apply(d)).count }
+    }
+    #if canImport(Darwin)
+    var runs = 0
+    let inline = measure(3) {
+        runs = 0
+        let options = AttributedString.MarkdownParsingOptions(allowsExtendedAttributes: false, interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
+        for d in docs {
+            for b in MarkdownBlocks.parse(MarkdownPreprocess.apply(d)) {
+                var texts: [String] = []
+                switch b {
+                case .paragraph(let t), .heading(_, let t), .quote(let t): texts = [t]
+                case .list(_, _, let items): texts = items.map(\.text)
+                case .table(let h, let r): texts = h + r.flatMap { $0 }
+                default: break
+                }
+                for t in texts { runs += ((try? AttributedString(markdown: t, options: options)).map { $0.runs.count } ?? 0) }
+            }
+        }
+    }
+    #endif
+
+    report.append("### 5. Markdown — \(docs.count) comments (\(docs.reduce(0) { $0 + $1.utf8.count } / 1024) KiB), preprocess + parse to a render tree")
+    report.append("")
+    row("Pipeline", "Total", "Per comment")
+    row("---", "---", "---")
+    row("Preprocess + block parse (this client)", ms(parse), us(parse, per: docs.count))
+    #if canImport(Darwin)
+    row("… + inline AttributedString for every block (this client, uncached)", ms(inline), us(inline, per: docs.count))
+    #endif
+    report.append("")
+    precondition(blocks > 0)
 }
 
 #if os(Linux)

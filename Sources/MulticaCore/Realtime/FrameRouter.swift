@@ -191,7 +191,7 @@ private struct Envelope: Decodable {
 
         default:
             let raw = (try? c.decodeIfPresent(JSONValue.self, forKey: .payload)) ?? .null
-            result = .event(.resource(type: type, payload: raw ?? .null))
+            result = .event(.resource(type: type, payload: raw))
         }
     }
 }

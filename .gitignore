@@ -5,3 +5,6 @@ DerivedData/
 dist/
 .DS_Store
 .worktrees/
+scripts/perf/js/node_modules/
+scripts/perf/js/dist/
+scripts/perf/js/package-lock.json
