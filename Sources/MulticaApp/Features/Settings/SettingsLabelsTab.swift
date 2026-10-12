@@ -32,7 +32,6 @@ struct SettingsLabelsTab: View {
         } else if lists[scope] == nil {
             lists[scope] = []
         }
-        if scope == "issue" { await session.labels.refreshIfLoaded() }
     }
 }
 

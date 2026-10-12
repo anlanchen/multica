@@ -276,8 +276,12 @@ struct SettingsMembersTab: View {
                         return false
                     }
                     let key = "invite-seat-\(session.workspace.id)-\(UUID().uuidString.lowercased())"
-                    purchase = SettingsSeatPurchaseFlow(workspaceID: session.workspace.id, email: email, role: role, preview: preview,
+                    let flow = SettingsSeatPurchaseFlow(workspaceID: session.workspace.id, email: email, role: role, preview: preview,
                                                         idempotencyKey: String(key.prefix(200)))
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(350))
+                        purchase = flow
+                    }
                     return true
                 } catch {
                     toaster.error((error as? SettingsAPIError)?.code == "seat_purchase_in_progress"

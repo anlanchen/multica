@@ -68,7 +68,10 @@ struct SettingsIssueStatusesTab: View {
         .sheet(item: $archiving) { status in
             SettingsArchiveStatusSheet(status: status, onClose: { archiving = nil }, onViewIssues: {
                 archiving = nil
-                inspecting = status
+                Task {
+                    try? await Task.sleep(for: .milliseconds(350))
+                    inspecting = status
+                }
             })
         }
         .sheet(item: $inspecting) { status in

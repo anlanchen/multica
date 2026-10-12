@@ -105,18 +105,12 @@ struct SettingsPage: View {
 
     private func sidebar(groups: [SettingsNavGroup], entries: [SettingsNavEntry], active: SettingsNavEntry) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 4) {
-                if env.shell.sidebarVisibility == .detailOnly {
-                    Button { env.shell.toggleSidebar() } label: { Image(systemName: "sidebar.left") }
-                        .buttonStyle(.borderless)
-                        .help(tr("settings", "page.navigate"))
-                }
-                Text(tr("settings", "page.title")).font(Theme.Font.title)
-            }
-            .padding(.horizontal, 20)
-            .frame(height: 60, alignment: .leading)
+            Text(tr("settings", "page.title"))
+                .font(Theme.Font.title)
+                .padding(.horizontal, 20)
+                .frame(height: 60, alignment: .leading)
 
-            searchField(entries: entries)
+            searchField
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
 
@@ -140,7 +134,7 @@ struct SettingsPage: View {
         .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    private func searchField(entries: [SettingsNavEntry]) -> some View {
+    private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).imageScale(.small)
             TextField(tr("settings", "page.search"), text: $query)
