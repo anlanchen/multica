@@ -100,6 +100,20 @@ final class ConnectionsTests: XCTestCase {
         XCTAssertEqual(payload["s"], "v")
     }
 
+    func testPluginSurfaceBridge() {
+        for ok in ["/context", "/issues/abc", "/issues/abc/comments", "/storage/user", "/storage/workspace/key", "/hooks/sync"] {
+            XCTAssertTrue(ConnectionsPlugins.isAllowedBridgePath(ok), ok)
+        }
+        for bad in ["/", "context", "/issues", "/issues/a/b", "/storage/other", "/members", "/hooks/a/b", "/issues//comments"] {
+            XCTAssertFalse(ConnectionsPlugins.isAllowedBridgePath(bad), bad)
+        }
+        XCTAssertNil(ConnectionsPlugins.surfaceDocument(url: "javascript:alert(1)", bridgeToken: "t", theme: [:]))
+        XCTAssertNil(ConnectionsPlugins.surfaceDocument(url: "https://plugins.example.com/p", bridgeToken: "", theme: [:]))
+        let doc = ConnectionsPlugins.surfaceDocument(url: "https://plugins.example.com:8443/p/index.html", bridgeToken: "tok", theme: ["--background": "#fff"])
+        XCTAssertTrue(doc?.contains("frame-src https://plugins.example.com:8443") ?? false)
+        XCTAssertFalse(doc?.contains("tok\"") ?? true)
+    }
+
     func testBillingUsageAndFormatting() {
         let limited = WorkspaceSubscriptionEntitlements(limits: ["autopilotRuns": ["mode": "limited", "limit": 100], "issue_count": ["mode": "unlimited"]])
         XCTAssertTrue(limited.connectionsIssueLimit.unlimited)

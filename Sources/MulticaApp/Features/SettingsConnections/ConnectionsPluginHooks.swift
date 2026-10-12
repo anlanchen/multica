@@ -17,6 +17,8 @@ final class ConnectionsPluginCatalog {
 
     private(set) var installations: [PluginInstallation] = []
     private(set) var running: String?
+    /// The `modal` surface an issue menu opened (presented by the page host).
+    var openModal: ConnectionsPluginModalTarget?
     @ObservationIgnored private var loaded = false
 
     func loadIfNeeded(_ session: WorkspaceSession) async {

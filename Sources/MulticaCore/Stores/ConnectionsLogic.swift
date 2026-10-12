@@ -465,6 +465,120 @@ public enum ConnectionsPlugins {
         author["name"]?.stringValue ?? author.stringValue ?? ""
     }
 
+    // MARK: Surface bridge
+
+    public static let bridgeProtocolVersion = 2
+    public static let bridgeConnectMessage = "multica:plugin-bridge-connect"
+    public static let bridgeMethods: Set<String> = ["GET", "POST", "PATCH", "PUT", "DELETE"]
+    /// Upstream caps a surface's requested height.
+    public static let maxSurfaceHeight = 4000.0
+
+    /// The Action API paths a surface may call through the bridge.
+    public static func isAllowedBridgePath(_ path: String) -> Bool {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard parts.first == "", parts.count >= 2, parts.dropFirst().allSatisfy({ !$0.isEmpty }) else { return false }
+        let p = Array(parts.dropFirst())
+        switch (p.count, p[0]) {
+        case (1, "context"): return true
+        case (2, "issues"): return true
+        case (3, "issues"): return p[2] == "comments"
+        case (2, "storage"): return p[1] == "workspace" || p[1] == "user"
+        case (3, "storage"): return p[1] == "workspace" || p[1] == "user"
+        case (2, "hooks"): return true
+        default: return false
+        }
+    }
+
+    public static func surfaceOrigin(_ url: String) -> String? {
+        guard let c = URLComponents(string: url), let scheme = c.scheme?.lowercased(), scheme == "https" || scheme == "http",
+              let host = c.host, !host.isEmpty else { return nil }
+        return "\(scheme)://\(host)\(c.port.map { ":\($0)" } ?? "")"
+    }
+
+    /// The trusted outer document hosting a plugin surface: it frames the
+    /// hosted URL in a scripts-only sandbox, accepts the guest's bridge port
+    /// once the single-use token matches, and relays requests to the native
+    /// `multicaPluginBridge` message handler. nil for an unusable launch.
+    public static func surfaceDocument(url: String, bridgeToken: String, theme: [String: String]) -> String? {
+        guard let origin = surfaceOrigin(url), !bridgeToken.isEmpty else { return nil }
+        let config: JSONValue = ["url": .string(url), "bridgeToken": .string(bridgeToken),
+                                 "theme": .object(theme.mapValues { .string($0) })]
+        guard let data = try? JSONCoders.encoder.encode(config) else { return nil }
+        let encoded = data.base64EncodedString()
+        let csp = ["default-src 'none'", "script-src 'unsafe-inline'", "style-src 'unsafe-inline'", "frame-src \(origin)",
+                   "connect-src 'none'", "img-src 'none'", "font-src 'none'", "object-src 'none'", "base-uri 'none'",
+                   "form-action 'none'"].joined(separator: "; ")
+            .replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        return """
+        <!doctype html>
+        <html>
+        <head>
+        <meta http-equiv="Content-Security-Policy" content="\(csp)">
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+        html, body, #multica-plugin-root, iframe { width: 100%; height: 100%; margin: 0; padding: 0; border: 0; }
+        body { overflow: hidden; background: transparent; }
+        </style>
+        </head>
+        <body>
+        <div id="multica-plugin-root"></div>
+        <script>
+        (function () {
+          var binary = atob("\(encoded)");
+          var bytes = new Uint8Array(binary.length);
+          for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          var config = JSON.parse(new TextDecoder().decode(bytes));
+          var native = window.webkit.messageHandlers.multicaPluginBridge;
+          var child = document.createElement("iframe");
+          child.title = "Plugin content";
+          child.setAttribute("sandbox", "allow-scripts");
+          var state = "launching";
+          var loadCount = 0;
+          var port = null;
+          function stopSurface(type) {
+            if (state === "terminal") return;
+            state = "terminal";
+            if (port) { port.close(); port = null; }
+            native.postMessage({ type: type });
+          }
+          window.__multicaBridgeReply = function (message) { if (port) port.postMessage(message); };
+          document.addEventListener("securitypolicyviolation", function (event) {
+            if (event.effectiveDirective === "frame-src" || event.effectiveDirective === "child-src") {
+              stopSurface("multica:plugin-surface-navigation-blocked");
+            }
+          });
+          child.addEventListener("load", function () {
+            loadCount += 1;
+            if (loadCount > 1) stopSurface("multica:plugin-surface-navigated");
+          });
+          window.addEventListener("message", function (event) {
+            if (!child.contentWindow || event.source !== child.contentWindow) return;
+            var data = event.data || {};
+            if (data.type === "multica:plugin-surface-error" || data.type === "multica:plugin-surface-navigated") {
+              stopSurface(data.type);
+              return;
+            }
+            if (data.type !== "\(bridgeConnectMessage)" || data.version !== \(bridgeProtocolVersion) ||
+                data.challenge !== config.bridgeToken || state !== "launching" || !event.ports[0]) return;
+            state = "connected";
+            config.bridgeToken = "";
+            port = event.ports[0];
+            port.onmessage = function (e) { native.postMessage({ type: "request", request: e.data }); };
+            port.start();
+            port.postMessage({ kind: "theme", theme: config.theme });
+          });
+          child.src = config.url;
+          config.url = "";
+          document.getElementById("multica-plugin-root").appendChild(child);
+        })();
+        </script>
+        </body>
+        </html>
+        """
+    }
+
     /// Config values to send: every edited value plus only the secrets the
     /// admin typed (an empty secret would clear the stored one).
     public static func configPayload(values: [String: JSONValue], secrets: [String: String]) -> [String: JSONValue] {
