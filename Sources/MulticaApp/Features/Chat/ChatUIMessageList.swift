@@ -291,7 +291,7 @@ struct ChatUIAssistantTurn: View {
             if let taskID, message != nil { store.loadTimeline(taskID) }
         }
         .onChange(of: timeline?.items.count) { if message == nil { follow?.follow() } }
-        .onChange(of: timeline?.finalText.count) { if message == nil { follow?.follow() } }
+        .onChange(of: timeline?.finalText.utf8.count) { if message == nil { follow?.follow() } }
         .onChange(of: message?.quickActions?.count) { follow?.follow() }
         .onChange(of: markerPending) { follow?.follow() }
     }

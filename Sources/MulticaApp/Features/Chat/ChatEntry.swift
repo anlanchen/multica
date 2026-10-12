@@ -14,6 +14,7 @@ struct ChatPage: View {
     @State private var consumedAgentIntent: String?
     @State private var appActive = NSApp.isActive
     @State private var width: CGFloat = 1000
+    @AppStorage("multica.chat.listWidth") private var listWidth: Double = 260
 
     private var isCompact: Bool { width < 640 }
 
@@ -24,14 +25,16 @@ struct ChatPage: View {
                 if g.size.width < 640 {
                     compact(store)
                 } else {
-                    HSplitView {
+                    let w = min(max(listWidth, 240), min(480, g.size.width * 0.6))
+                    HStack(spacing: 0) {
                         VStack(spacing: 0) {
                             listHeader(store)
                             list
                         }
-                        .frame(minWidth: 240, idealWidth: 260, maxWidth: 480, maxHeight: .infinity)
+                        .frame(width: w)
+                        ChatUISplitDivider(width: $listWidth, current: w, range: 240...min(480, g.size.width * 0.6))
                         detail(store)
-                            .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             }
@@ -211,6 +214,37 @@ struct ChatPage: View {
             toaster.error(tr("chat", "page.agent_link_no_access"))
             nav.setQuery("agent", nil)
         }
+    }
+}
+
+/// Draggable boundary between the thread list and the conversation; the
+/// list width persists (upstream resizable panel layout).
+struct ChatUISplitDivider: View {
+    @Binding var width: Double
+    let current: CGFloat
+    let range: ClosedRange<CGFloat>
+    @State private var start: CGFloat?
+
+    var body: some View {
+        Rectangle()
+            .fill(Theme.border)
+            .frame(width: 1)
+            .frame(maxHeight: .infinity)
+            .overlay {
+                Color.clear
+                    .frame(width: 8)
+                    .contentShape(Rectangle())
+                    .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
+                    .gesture(
+                        DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                            .onChanged { g in
+                                let base = start ?? current
+                                if start == nil { start = base }
+                                width = Double(min(max(base + g.translation.width, range.lowerBound), range.upperBound))
+                            }
+                            .onEnded { _ in start = nil }
+                    )
+            }
     }
 }
 

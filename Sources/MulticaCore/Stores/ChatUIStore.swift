@@ -88,7 +88,7 @@ public final class ChatUIStore {
         self.storage = storage
         self.slug = session.workspace.slug
         self.userID = session.currentUser.id
-        let ws = { (base: String) in "\(base).\(session.workspace.slug)" }
+        let ws = { (base: String) in "\(base).\(session.workspace.slug).\(session.currentUser.id)" }
         activeSessionID = storage.string(ws(Keys.activeSession))
         selectedAgentID = storage.string(ws(Keys.selectedAgent))
         selectedProjectID = storage.string(ws(Keys.selectedProject))
@@ -122,7 +122,9 @@ public final class ChatUIStore {
         static let floatingEnabled = "multica.chat.floatingChatEnabled"
     }
 
-    private func wsKey(_ base: String) -> String { "\(base).\(slug)" }
+    /// Per workspace and per user, so a later sign-in never inherits another
+    /// account's drafts or selection.
+    private func wsKey(_ base: String) -> String { "\(base).\(slug).\(userID)" }
 
     static func decode<T: Decodable>(_ type: T.Type, _ raw: String?) -> T? {
         guard let raw, let data = raw.data(using: .utf8) else { return nil }

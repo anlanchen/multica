@@ -38,7 +38,8 @@ struct ChatUIConversationBody: View {
                 if let conv {
                     ChatUIQueue(conversation: conv, sendNowDisabled: ctx.isAgentAccessRevoked)
                 }
-                ChatUIComposer(surface: surface, focusOnAppear: focusOnAppear, leftAdornment: leftAdornment, onProjectChange: onProjectChange)
+                ChatUIComposer(surface: surface, focusOnAppear: focusOnAppear, leftAdornment: leftAdornment, onProjectChange: onProjectChange,
+                               maxEditorHeight: max(60, min(384, g.size.height * 0.5) - 56))
                     .zIndex(1)
             }
             .environment(\.chatUIGutter, ChatUILayout.gutter(forWidth: g.size.width))
@@ -74,6 +75,8 @@ struct ChatUIComposer: View {
     var focusOnAppear = false
     var leftAdornment: AnyView? = nil
     var onProjectChange: ((String?) -> Void)? = nil
+    /// The composer grows with the draft up to half the chat surface.
+    var maxEditorHeight: CGFloat = 280
     @State private var submitting = false
     @State private var editorGeneration = 0
     @State private var dropTargeted = false
@@ -103,7 +106,7 @@ struct ChatUIComposer: View {
                 text: Binding(get: { store.draft(key) }, set: { store.setDraft(key, $0) }),
                 placeholder: placeholder(ctx, disabled: disabled),
                 minHeight: 36,
-                maxHeight: 280,
+                maxHeight: maxEditorHeight,
                 autofocus: editorGeneration > 0,
                 isEditable: !submitting && !noAgent,
                 onSubmit: { submit(key: key) },
