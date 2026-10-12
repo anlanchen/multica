@@ -142,6 +142,10 @@ public enum SearchPaletteMatch {
 
 /// Invisible synonyms per sidebar page (upstream PAGE_KEYWORDS).
 public enum SearchPalettePages {
+    /// Upstream WORKSPACE_PAGES registry order.
+    public static let order: [WorkspacePage] = [.inbox, .chat, .myIssues, .issues, .projects, .autopilots,
+                                                .agents, .squads, .usage, .runtimes, .skills, .settings]
+
     public static func keywords(_ page: WorkspacePage) -> [String] {
         switch page {
         case .inbox: return ["inbox", "notifications", "收件箱", "通知"]
