@@ -67,7 +67,7 @@ struct SettingsAccountTab: View {
         }
         .task(id: session.currentUser.id) { await load() }
         .onChange(of: draft) { feed() }
-        .onChange(of: record) { feed() }
+        .onChange(of: record) { autoSave?.setSaved(saved) }
         .onChange(of: about) { old, new in
             if new.utf16.count > SettingsRules.maxProfileDescription && old.utf16.count <= SettingsRules.maxProfileDescription { about = old }
         }
@@ -92,18 +92,19 @@ struct SettingsAccountTab: View {
         do {
             let me = try await session.api.getMe()
             let first = record == nil
-            record = me
             if first {
                 name = me.name
                 about = me.profileDescription
             }
+            record = me
+            autoSave?.setSaved(saved)
         } catch {
             toaster.error(error)
         }
     }
 
     private func feed() {
-        autoSave?.update(value: draft, saved: saved, enabled: canSave)
+        autoSave?.update(value: draft, enabled: canSave)
     }
 
     private func saveAvatar(_ url: String) async -> Bool {

@@ -267,27 +267,34 @@ struct SettingsPage: View {
 
     // MARK: Content
 
+    /// Pages owned by other areas; they may scroll themselves, so they get
+    /// at least the viewport height instead of collapsing inside ours.
+    private static let embeddedTabs: Set<String> = ["apps", "billing", "code", "channels", "mcp", "plugins", "daemon"]
+
     private func content(active: SettingsNavEntry, location: SettingsLocation) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                tabContent(active.value)
-                    .frame(maxWidth: active.wide ? 1024 : 896, alignment: .leading)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 32)
-                    .frame(maxWidth: .infinity)
-            }
-            .id("\(active.value):\(location.integration ?? "")")
-            .environment(\.settingsFlashAnchor, flash)
-            .task(id: "\(active.value)|\(location.section ?? "")") {
-                guard let section = location.section else { return }
-                for delay in [60, 650] {
-                    try? await Task.sleep(for: .milliseconds(delay))
-                    guard !Task.isCancelled else { return }
-                    withAnimation { proxy.scrollTo(SettingsAnchor.id(section), anchor: .center) }
-                    flash = section
+        GeometryReader { geo in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    tabContent(active.value)
+                        .frame(maxWidth: active.wide ? 1024 : 896, alignment: .leading)
+                        .frame(minHeight: Self.embeddedTabs.contains(active.value) ? max(0, geo.size.height - 64) : nil, alignment: .top)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 32)
+                        .frame(maxWidth: .infinity)
                 }
-                try? await Task.sleep(for: .milliseconds(1600))
-                if flash == section { flash = nil }
+                .id("\(active.value):\(location.integration ?? "")")
+                .environment(\.settingsFlashAnchor, flash)
+                .task(id: "\(active.value)|\(location.section ?? "")") {
+                    guard let section = location.section else { return }
+                    for delay in [60, 650] {
+                        try? await Task.sleep(for: .milliseconds(delay))
+                        guard !Task.isCancelled else { return }
+                        withAnimation { proxy.scrollTo(SettingsAnchor.id(section), anchor: .center) }
+                        flash = section
+                    }
+                    try? await Task.sleep(for: .milliseconds(1600))
+                    if flash == section { flash = nil }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

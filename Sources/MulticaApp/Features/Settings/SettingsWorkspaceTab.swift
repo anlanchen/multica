@@ -112,7 +112,6 @@ struct SettingsWorkspaceTab: View {
         }
         .task(id: session.revision("workspace")) { await load() }
         .onChange(of: draft) { feed(canManage: canManage) }
-        .onChange(of: record) { feed(canManage: canManage) }
         .onChange(of: canManage) { feed(canManage: canManage) }
         .onChange(of: focused) { old, new in
             if old != nil && new != old { autoSave?.flush() }
@@ -192,6 +191,7 @@ struct SettingsWorkspaceTab: View {
                     "name": JSONValue(next.name), "description": JSONValue(next.description), "context": JSONValue(next.context),
                 ])
                 record = updated
+                autoSave?.setSaved(saved)
                 env.settingsAdopt(updated)
             }, onError: { error in
                 toaster.show((error as? APIError)?.message ?? tr("settings", "workspace.toast_save_failed"), kind: .error)
@@ -199,27 +199,33 @@ struct SettingsWorkspaceTab: View {
         }
         do {
             let fresh = try await session.api.getWorkspace(wsID)
-            let first = record == nil
-            record = fresh
+            adopt(fresh)
             env.settingsAdopt(fresh)
-            if first {
-                name = fresh.name
-                details = fresh.description ?? ""
-                context = fresh.context ?? ""
-            }
         } catch {
             if record == nil { toaster.error(error) }
         }
     }
 
+    /// Takes a server copy; a draft without pending edits follows it (another
+    /// admin's rename), one being edited is kept.
+    private func adopt(_ fresh: WorkspaceRecord) {
+        if record == nil || draft == saved {
+            name = fresh.name
+            details = fresh.description ?? ""
+            context = fresh.context ?? ""
+        }
+        record = fresh
+        autoSave?.setSaved(saved)
+    }
+
     private func feed(canManage: Bool) {
-        autoSave?.update(value: draft, saved: saved, enabled: record != nil && canManage && !name.trimmingCharacters(in: .whitespaces).isEmpty)
+        autoSave?.update(value: draft, enabled: record != nil && canManage && !name.trimmingCharacters(in: .whitespaces).isEmpty)
     }
 
     private func saveLogo(_ url: String) async -> Bool {
         do {
             let updated = try await session.api.updateWorkspace(session.workspace.id, patch: ["avatar_url": JSONValue(url)])
-            record = updated
+            adopt(updated)
             env.settingsAdopt(updated)
             return true
         } catch {
@@ -233,7 +239,7 @@ struct SettingsWorkspaceTab: View {
         Task {
             do {
                 let updated = try await session.api.updateWorkspace(session.workspace.id, patch: ["issue_prefix": JSONValue(prefix)])
-                record = updated
+                adopt(updated)
                 env.settingsAdopt(updated)
                 prefixStatus = .saved
                 prefixDraft = nil

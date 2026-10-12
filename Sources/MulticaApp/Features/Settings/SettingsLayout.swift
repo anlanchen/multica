@@ -240,7 +240,7 @@ struct SettingsRowView<Description: View, Control: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let width = size?.width {
-                control().frame(width: width, alignment: .trailing)
+                control().frame(minWidth: min(160, width), maxWidth: width, alignment: .trailing)
             } else {
                 control().fixedSize(horizontal: size == nil, vertical: false)
             }
@@ -497,14 +497,17 @@ final class SettingsAutoSave<Value: Equatable> {
         self.onError = onError
     }
 
-    /// Feed every draft or saved-value change.
-    func update(value: Value, saved: Value, enabled: Bool) {
+    /// The server's current value (after a load, a save or a realtime refresh).
+    func setSaved(_ saved: Value) {
+        guard saved != observedSaved else { return }
+        observedSaved = saved
+        persisted = saved
+    }
+
+    /// Feed every draft edit (and permission change); saves after a pause.
+    func update(value: Value, enabled: Bool) {
         self.enabled = enabled
         latest = value
-        if saved != observedSaved {
-            observedSaved = saved
-            persisted = saved
-        }
         timer?.cancel()
         timer = nil
         guard enabled, value != persisted else {
