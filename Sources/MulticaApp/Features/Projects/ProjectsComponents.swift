@@ -252,7 +252,7 @@ struct ProjectsLeadTrigger: View {
     var body: some View {
         HStack(spacing: 6) {
             if let leadType, let leadID, name != nil {
-                ActorAvatar(type: leadType, id: leadID, size: avatarSize)
+                ActorAvatar(type: leadType, id: leadID, size: avatarSize).membersHoverCard(type: leadType, id: leadID)
             } else {
                 Circle()
                     .strokeBorder(Color.secondary.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
@@ -475,7 +475,6 @@ struct ProjectsChip: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 2)
         .frame(maxWidth: 288, alignment: .leading)
-        .fixedSize(horizontal: true, vertical: false)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.medium).strokeBorder(Theme.border))
         .task(id: projectID) {
             await session.projects.loadIfNeeded()

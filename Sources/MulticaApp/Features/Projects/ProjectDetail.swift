@@ -255,7 +255,7 @@ struct ProjectsDetailSidebar: View {
                 ProjectsLeadPicker(leadType: project.leadType, leadID: project.leadId, onChange: { update(ProjectsPatch(lead: .some($0))) }) { name in
                     HStack(spacing: 6) {
                         if let t = project.leadType, let id = project.leadId, let name {
-                            ActorAvatar(type: t, id: id, size: 16)
+                            ActorAvatar(type: t, id: id, size: 16).membersHoverCard(type: t, id: id)
                             Text(name)
                         } else {
                             Text(tr("projects", "lead.no_lead")).foregroundStyle(.secondary)
@@ -339,6 +339,7 @@ private struct ProjectsTitleEditor: View {
     let title: String
     let onCommit: (String) -> Void
     @State private var draft = ""
+    @State private var committed: String?
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -348,14 +349,18 @@ private struct ProjectsTitleEditor: View {
             .focused($focused)
             .onSubmit(commit)
             .onAppear { draft = title }
-            .onChange(of: title) { if !focused { draft = title } }
+            .onChange(of: title) {
+                committed = nil
+                if !focused { draft = title }
+            }
             .onChange(of: projectID) { draft = title }
             .onChange(of: focused) { if !focused { commit() } }
     }
 
     private func commit() {
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty && trimmed != title {
+        if !trimmed.isEmpty && trimmed != title && trimmed != committed {
+            committed = trimmed
             onCommit(trimmed)
         } else if trimmed.isEmpty {
             draft = title
@@ -413,7 +418,7 @@ private struct ProjectsDescriptionEditor: View {
     private func flush() {
         let md = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard md != saved.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-        saved = draft
+        saved = md
         onSave(md)
     }
 
