@@ -1,11 +1,11 @@
 import MulticaCore
 import SwiftUI
 
-// Placeholder entry points for the Settings › Connections and billing tabs;
-// replaced by the full screens.
+// Settings › Connections tab bodies, embedded by the Settings page. Each is a
+// self-contained scrollable page.
 
 struct ConnectedAppsSettingsTab: View {
-    var body: some View { EmptyStateView(icon: "puzzlepiece", title: tr("settings", "page.tabs.apps")) }
+    var body: some View { ConnectionsAppsTab() }
 }
 
 struct BillingSettingsTab: View {
@@ -13,7 +13,7 @@ struct BillingSettingsTab: View {
 }
 
 struct CodeSettingsTab: View {
-    var body: some View { EmptyStateView(icon: "chevron.left.forwardslash.chevron.right", title: tr("settings", "page.tabs.code")) }
+    var body: some View { ConnectionsCodeTab() }
 }
 
 struct ChannelsSettingsTab: View {
@@ -21,7 +21,7 @@ struct ChannelsSettingsTab: View {
 }
 
 struct McpSettingsTab: View {
-    var body: some View { EmptyStateView(icon: "server.rack", title: tr("settings", "page.tabs.mcp")) }
+    var body: some View { ConnectionsMcpTab() }
 }
 
 struct PluginsSettingsTab: View {
