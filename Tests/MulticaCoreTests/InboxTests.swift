@@ -100,7 +100,7 @@ final class InboxTests: XCTestCase {
         let rows = [item("a", issue: "1"), item("b", issue: "2"), item("c")]
         XCTAssertEqual(InboxFiltering.selectionAfterRemoving("a", from: rows, selectedKey: "1"), .some("2"))
         XCTAssertEqual(InboxFiltering.selectionAfterRemoving("c", from: rows, selectedKey: "c"), .some("2"))
-        XCTAssertNil(InboxFiltering.selectionAfterRemoving("a", from: rows, selectedKey: "2"))
+        XCTAssertTrue(InboxFiltering.selectionAfterRemoving("a", from: rows, selectedKey: "2") == nil)
         let last = InboxFiltering.selectionAfterRemoving("x", from: [item("x")], selectedKey: "x")
         XCTAssertEqual(last, .some(nil))
     }
