@@ -169,7 +169,8 @@ struct AutopilotsListScreen: View {
         .overlay(alignment: .bottom) {
             if tab == "autopilots" && !selected.isEmpty { batchToolbar }
         }
-        .task(id: session.revision("autopilot")) {
+        .task(id: "\(tab) \(session.revision("autopilot"))") {
+            guard tab == "autopilots" else { return }
             if session.revision("autopilot") == 0 { await store.loadIfNeeded() } else { await store.load() }
         }
         .onChange(of: store.items, initial: true) { recompute() }
