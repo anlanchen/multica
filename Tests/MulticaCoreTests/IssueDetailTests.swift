@@ -166,6 +166,22 @@ final class IssueDetailTests: XCTestCase {
         XCTAssertEqual(IssueDetailFormat.workdirTarget([running])?.path, "/tmp/run")
     }
 
+    func testRunGateConfirmsAssignAndPromote() {
+        let category: (String) -> StatusCategory? = { IssueStatusKey(rawValue: $0).builtInCategory }
+        XCTAssertEqual(IssueDetailRunGate.intent(currentStatus: "todo", currentCategory: nil, owner: nil,
+                                                 newAssignee: ActorRef(type: "agent", id: "a1"), newStatus: nil, categoryOf: category),
+                       .assign(type: "agent", id: "a1"))
+        XCTAssertNil(IssueDetailRunGate.intent(currentStatus: "backlog", currentCategory: nil, owner: nil,
+                                               newAssignee: ActorRef(type: "agent", id: "a1"), newStatus: nil, categoryOf: category))
+        XCTAssertEqual(IssueDetailRunGate.intent(currentStatus: "backlog", currentCategory: nil, owner: ActorRef(type: "agent", id: "a1"),
+                                                 newAssignee: nil, newStatus: "todo", categoryOf: category),
+                       .promote(status: "todo", type: "agent", id: "a1"))
+        XCTAssertNil(IssueDetailRunGate.intent(currentStatus: "backlog", currentCategory: nil, owner: ActorRef(type: "agent", id: "a1"),
+                                               newAssignee: nil, newStatus: "done", categoryOf: category))
+        XCTAssertNil(IssueDetailRunGate.intent(currentStatus: "todo", currentCategory: nil, owner: ActorRef(type: "agent", id: "a1"),
+                                               newAssignee: nil, newStatus: "in_progress", categoryOf: category))
+    }
+
     @MainActor
     func testReactionEventsRespectCommentRevision() {
         let model = IssueDetailModel(issueID: "i1")

@@ -93,23 +93,95 @@ public struct IssueDetailWakeupSpec: Sendable, Hashable {
             break
         }
         let agent = filterAgentID.map { n.actor("agent", $0) } ?? tr("issues", "wakeups.agent_subject")
-        let condition: String
         if eventTypes.count == 1, let ev = eventTypes.first {
-            let key = "wakeups.conditions." + ev.replacingOccurrences(of: ".", with: "_")
-            let s = tr("issues", key, ["agent": agent])
-            condition = s == key ? tr("issues", "wakeups.unknown_event", ["event": ev]) : s
-        } else {
-            let labels = eventTypes.map { ev -> String in
-                let key = "wakeups." + ev.replacingOccurrences(of: ".", with: "_")
-                let s = tr("issues", key)
-                return s == key ? ev : s
+            let label = Self.eventName(ev, agent: agent)
+            let actor = filterActorType.flatMap { t in filterActorID.map { n.actor(t, $0) } } ?? filterAgentID.map { n.actor("agent", $0) }
+            if let actor, !ev.hasPrefix("task.") {
+                return tr("issues", "wakeups.by_actor", ["condition": label, "agent": actor])
             }
-            condition = labels.isEmpty ? tr("issues", "wakeups.any_event") : tr("issues", "wakeups.any_event") + ": " + labels.joined(separator: ", ")
+            return label
         }
-        if let t = filterActorType, let id = filterActorID {
-            return tr("issues", "wakeups.by_actor", ["condition": condition, "agent": n.actor(t, id)])
+        let labels = eventTypes.map { ev -> String in
+            let key = "wakeups." + Self.eventKey(ev)
+            let s = tr("issues", key)
+            return s == key ? ev : s
         }
-        return condition
+        return labels.isEmpty ? tr("issues", "wakeups.any_event") : tr("issues", "wakeups.any_event") + ": " + labels.joined(separator: ", ")
+    }
+
+    /// `task.completed` → `run_completed`, `issue.assignee_changed` →
+    /// `assignee_changed`, `comment.created` → `comment_created`.
+    static func eventKey(_ event: String) -> String {
+        if event.hasPrefix("task.") { return "run_" + event.dropFirst(5) }
+        if event.hasPrefix("issue.") {
+            let rest = String(event.dropFirst(6))
+            return rest == "updated" ? "issue_updated" : rest
+        }
+        return event.replacingOccurrences(of: ".", with: "_")
+    }
+
+    static func eventName(_ event: String, agent: String) -> String {
+        let key = "wakeups.conditions." + eventKey(event)
+        let s = tr("issues", key, ["agent": agent])
+        return s == key ? tr("issues", "wakeups.unknown_event", ["event": event]) : s
+    }
+
+    /// What the issue is waiting for, in a few words (upstream `waiting`).
+    public func waiting(_ n: IssueDetailNames) -> String {
+        if let c = condition, let s = Self.wait(condition: c, n) { return s }
+        if kind != "event" {
+            guard let next = nextFireAt else { return describe(n) }
+            return tr("issues", "wakeups.wait.time", ["time": n.time(next), "agent": n.actor("agent", agentID)])
+        }
+        if eventTypes == ["comment.created"] {
+            if let t = filterActorType, let id = filterActorID {
+                return tr("issues", "wakeups.wait.reply_from", ["name": n.actor(t, id)])
+            }
+            return tr("issues", "wakeups.wait.reply_any")
+        }
+        let runEnds: Set<String> = ["task.completed", "task.failed", "task.cancelled"]
+        if !eventTypes.isEmpty, eventTypes.allSatisfy(runEnds.contains) {
+            if let a = filterAgentID { return tr("issues", "wakeups.wait.run_end", ["agent": n.actor("agent", a)]) }
+            return tr("issues", "wakeups.wait.run_end_any")
+        }
+        return tr("issues", "wakeups.waiting_event")
+    }
+
+    /// Header chip copy: "<agent>: <what>"; time rules already name the agent.
+    public func headline(_ n: IssueDetailNames) -> String {
+        if kind != "event" && nextFireAt != nil { return waiting(n) }
+        return tr("issues", "wakeups.wait.header", ["agent": n.actor("agent", agentID), "what": waiting(n)])
+    }
+
+    static func wait(condition c: JSONValue, _ n: IssueDetailNames) -> String? {
+        switch c["type"]?.stringValue {
+        case "issue_field":
+            switch c["field"]?.stringValue {
+            case "status": return tr("issues", "wakeups.wait.status", ["status": n.status(c["value"]?.stringValue ?? "")])
+            case "assignee":
+                return tr("issues", "wakeups.wait.assignee", ["name": n.actor(c["assignee_type"]?.stringValue ?? "member", c["assignee_id"]?.stringValue ?? "")])
+            case "label":
+                return tr("issues", "wakeups.wait.label", ["label": c["label_id"]?.stringValue.flatMap(n.label) ?? tr("issues", "wakeups.cond.unknown_label")])
+            case "property":
+                let name = c["property_id"]?.stringValue.flatMap(n.property) ?? tr("issues", "wakeups.cond.unknown_property")
+                return tr("issues", "wakeups.wait.property", ["property": name, "value": c["value"]?.stringValue ?? ""])
+            default: return nil
+            }
+        case "children_done":
+            if let stage = c["stage"]?.doubleValue { return tr("issues", "wakeups.wait.children_stage", ["stage": Int(stage)]) }
+            return tr("issues", "wakeups.wait.children_all")
+        case "pull_request":
+            return tr("issues", c["event"]?.stringValue == "merged" ? "wakeups.wait.pr_merged" : "wakeups.wait.pr_checks")
+        case "other_issue":
+            let issue = c["identifier"]?.stringValue ?? tr("issues", "wakeups.cond.another_issue")
+            switch c["state"]?.stringValue {
+            case "ended": return tr("issues", "wakeups.wait.other_ended", ["issue": issue])
+            case "in_review": return tr("issues", "wakeups.wait.other_in_review", ["issue": issue])
+            default: return tr("issues", "wakeups.wait.other_done", ["issue": issue])
+            }
+        default:
+            return nil
+        }
     }
 
     static func describe(condition c: JSONValue, _ n: IssueDetailNames) -> String? {
@@ -315,6 +387,31 @@ public enum IssueDetailActivityText {
         default:
             return nil
         }
+    }
+}
+
+/// Upstream run-confirm-gate: the two single-issue writes that can hand
+/// work to an agent (assigning an agent/squad owner, promoting an owned
+/// issue out of backlog) confirm first.
+public enum IssueDetailRunGate: Sendable, Hashable {
+    case assign(type: String, id: String)
+    case promote(status: String, type: String, id: String)
+
+    public static func intent(currentStatus: String, currentCategory: StatusCategory?, owner: ActorRef?,
+                              newAssignee: ActorRef?, newStatus: String?, categoryOf: (String) -> StatusCategory?) -> IssueDetailRunGate? {
+        let parked = currentStatus == "backlog"
+        if let a = newAssignee, a.type == "agent" || a.type == "squad", !a.id.isEmpty, !parked {
+            return .assign(type: a.type, id: a.id)
+        }
+        let category = currentCategory ?? categoryOf(currentStatus)
+        if let status = newStatus, status != currentStatus, parked || category == nil,
+           let owner, owner.type == "agent" || owner.type == "squad", !owner.id.isEmpty, status != "backlog" {
+            let target = categoryOf(status)
+            if target == nil || !(target == .done || target == .closed) {
+                return .promote(status: status, type: owner.type, id: owner.id)
+            }
+        }
+        return nil
     }
 }
 
