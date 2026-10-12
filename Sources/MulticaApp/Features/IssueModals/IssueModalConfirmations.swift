@@ -104,27 +104,11 @@ struct IssueModalRunConfirm: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                IssueModalFlowLayout(spacing: 8, lineSpacing: 8) {
-                    Button { submit(intent, suppressRun: true) } label: {
-                        if pendingAction == true { ProgressView().controlSize(.small) } else { Text(tr("modals", "run_confirm.dont_start")) }
-                    }
-                    .buttonStyle(IssueModalOutlineButtonStyle())
-                    .disabled(submitting)
-                    Button { submit(intent, suppressRun: false) } label: {
-                        if pendingAction == false {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            HStack(spacing: 6) {
-                                Text(intent.mode == .promote ? tr("modals", "run_confirm.confirm_promote") : tr("modals", "run_confirm.confirm_assign"))
-                                IssueModalSendKeyCaps()
-                            }
-                        }
-                    }
-                    .buttonStyle(IssueModalPrimaryButtonStyle())
-                    .modifier(IssueModalSendShortcut())
-                    .disabled(submitting)
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    dontStartButton(intent)
+                    confirmButton(intent)
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .padding(24)
@@ -132,6 +116,30 @@ struct IssueModalRunConfirm: View {
         .interactiveDismissDisabled(submitting)
         .onExitCommand { if !submitting { dismiss() } }
         .task { await resolveIntent() }
+    }
+
+    private func dontStartButton(_ intent: IssueModalRunIntent) -> some View {
+        Button { submit(intent, suppressRun: true) } label: {
+            if pendingAction == true { ProgressView().controlSize(.small) } else { Text(tr("modals", "run_confirm.dont_start")) }
+        }
+        .buttonStyle(IssueModalOutlineButtonStyle())
+        .disabled(submitting)
+    }
+
+    private func confirmButton(_ intent: IssueModalRunIntent) -> some View {
+        Button { submit(intent, suppressRun: false) } label: {
+            if pendingAction == false {
+                ProgressView().controlSize(.small)
+            } else {
+                HStack(spacing: 6) {
+                    Text(intent.mode == .promote ? tr("modals", "run_confirm.confirm_promote") : tr("modals", "run_confirm.confirm_assign"))
+                    IssueModalSendKeyCaps()
+                }
+            }
+        }
+        .buttonStyle(IssueModalPrimaryButtonStyle())
+        .modifier(IssueModalSendShortcut())
+        .disabled(submitting)
     }
 
     /// The registered payload, or the issue's current agent owner.
