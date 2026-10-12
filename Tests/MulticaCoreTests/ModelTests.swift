@@ -221,3 +221,25 @@ final class MarkdownBlocksTests: XCTestCase {
         XCTAssertEqual(m.map(\.label), ["Ada", "Bot", "MUL-1"])
     }
 }
+
+final class SyntaxHighlighterTests: XCTestCase {
+    func testSwiftTokens() {
+        let code = "let x = \"hi\" // note\nstruct Foo { var n = 42 }"
+        let toks = SyntaxHighlighter.tokens(code, language: "swift")
+        let u = Array(code.utf16)
+        func text(_ t: SyntaxHighlighter.Token) -> String { String(utf16CodeUnits: Array(u[t.range]), count: t.range.count) }
+        let pairs = toks.map { (text($0), $0.kind) }
+        XCTAssertTrue(pairs.contains { $0 == ("let", .keyword) })
+        XCTAssertTrue(pairs.contains { $0 == ("\"hi\"", .string) })
+        XCTAssertTrue(pairs.contains { $0 == ("// note", .comment) })
+        XCTAssertTrue(pairs.contains { $0 == ("Foo", .type) })
+        XCTAssertTrue(pairs.contains { $0 == ("42", .number) })
+        XCTAssertTrue(SyntaxHighlighter.tokens(code, language: nil).isEmpty)
+        XCTAssertTrue(SyntaxHighlighter.tokens(code, language: "brainfuck").isEmpty)
+    }
+
+    func testDiff() {
+        let toks = SyntaxHighlighter.tokens("@@ -1 +1 @@\n-old\n+new\n ctx", language: "diff")
+        XCTAssertEqual(toks.map(\.kind), [.meta, .deleted, .inserted])
+    }
+}

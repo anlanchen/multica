@@ -140,7 +140,7 @@ struct CodeBlockView: View {
             .padding(.horizontal, 10)
             .padding(.top, 6)
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(code)
+                Text(CodeHighlight.render(code, language: language))
                     .font(Theme.Font.mono)
                     .textSelection(.enabled)
                     .padding(10)
@@ -192,5 +192,43 @@ struct ExpandableMarkdown: View {
                 .font(Theme.Font.caption)
             }
         }
+    }
+}
+
+/// Colors `SyntaxHighlighter` tokens (memoised per code + language).
+enum CodeHighlight {
+    @MainActor private static var cache: [String: AttributedString] = [:]
+
+    @MainActor static func render(_ code: String, language: String?) -> AttributedString {
+        let key = (language ?? "") + "\u{0}" + code
+        if let hit = cache[key] { return hit }
+        var a = AttributedString(code)
+        let tokens = SyntaxHighlighter.tokens(code, language: language)
+        if !tokens.isEmpty {
+            let utf16 = code.utf16
+            for t in tokens {
+                guard let lo = utf16.index(utf16.startIndex, offsetBy: t.range.lowerBound, limitedBy: utf16.endIndex),
+                      let hi = utf16.index(utf16.startIndex, offsetBy: t.range.upperBound, limitedBy: utf16.endIndex),
+                      let r = Range(NSRange(lo..<hi, in: code), in: a) else { continue }
+                switch t.kind {
+                case .keyword: a[r].foregroundColor = Color(light: 0xA626A4, dark: 0xC678DD)
+                case .string: a[r].foregroundColor = Color(light: 0x50A14F, dark: 0x98C379)
+                case .comment: a[r].foregroundColor = Color(light: 0xA0A1A7, dark: 0x7F848E)
+                case .number: a[r].foregroundColor = Color(light: 0x986801, dark: 0xD19A66)
+                case .type: a[r].foregroundColor = Color(light: 0xC18401, dark: 0xE5C07B)
+                case .attribute: a[r].foregroundColor = Color(light: 0x4078F2, dark: 0x61AFEF)
+                case .inserted:
+                    a[r].foregroundColor = Theme.success
+                    a[r].backgroundColor = Theme.success.opacity(0.10)
+                case .deleted:
+                    a[r].foregroundColor = Theme.destructive
+                    a[r].backgroundColor = Theme.destructive.opacity(0.10)
+                case .meta: a[r].foregroundColor = Theme.info
+                }
+            }
+        }
+        if cache.count > 500 { cache.removeAll() }
+        cache[key] = a
+        return a
     }
 }
