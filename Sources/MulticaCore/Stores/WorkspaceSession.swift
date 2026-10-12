@@ -45,6 +45,7 @@ public final class WorkspaceSession {
     @ObservationIgnored private var catalogRefresh: [CatalogKind: Task<Void, Never>] = [:]
     @ObservationIgnored private var nextPageOffset = 0
     @ObservationIgnored private var loadingMore = false
+    @ObservationIgnored private var eventTaps: [@MainActor (RealtimeEvent) -> Void] = []
     public static let pageSize = 200
 
     public init(workspace: Workspace, user: User, api: APIClient, realtime: RealtimeClient) {
@@ -67,7 +68,7 @@ public final class WorkspaceSession {
         labels.configure { try await api.listLabels().labels }
         properties.configure { try await api.listProperties(includeArchived: true).properties }
         quickActions.configure { try await api.listQuickActions(includeArchived: true).quickActions }
-        chatSessions.configure { try await api.listChatSessions() }
+        chatSessions.configure { try await api.listChatSessions(status: "all") }
         agentRecords.configure { try await api.listAgents(includeArchived: true) }
         memberRecords.configure { try await api.listMembers(workspaceId: workspaceID) }
         runtimeRecords.configure { try await api.listRuntimes() }
@@ -214,7 +215,14 @@ public final class WorkspaceSession {
 
     // MARK: Realtime application
 
+    /// Lets a feature store observe every typed event after the session
+    /// applied it (payloads of untyped events included).
+    public func addEventTap(_ tap: @escaping @MainActor (RealtimeEvent) -> Void) {
+        eventTaps.append(tap)
+    }
+
     public func apply(_ event: RealtimeEvent) {
+        defer { for tap in eventTaps { tap(event) } }
         switch event {
         case .issueUpsert(let issue, let flags):
             issues.upsert(issue, isNew: flags.created)

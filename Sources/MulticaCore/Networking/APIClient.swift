@@ -43,19 +43,22 @@ public struct URLSessionTransport: HTTPTransport {
 public struct APIError: Error, Sendable, Equatable, CustomStringConvertible {
     public var status: Int
     public var message: String
+    /// Structured refusal code (`reason_code`), e.g. `invocation_not_allowed`.
+    public var reasonCode: String?
 
-    public init(status: Int, message: String) {
+    public init(status: Int, message: String, reasonCode: String? = nil) {
         self.status = status
         self.message = message
+        self.reasonCode = reasonCode
     }
 
     public var isUnauthorized: Bool { status == 401 }
     public var description: String { "HTTP \(status): \(message)" }
 
     static func from(status: Int, body: Data) -> APIError {
-        struct ErrorBody: Decodable { var error: String? }
-        let message = (try? JSONCoders.decoder.decode(ErrorBody.self, from: body))?.error
-        return APIError(status: status, message: message ?? "Request failed with status \(status)")
+        struct ErrorBody: Decodable { var error: String?; var reason_code: String? }
+        let decoded = try? JSONCoders.decoder.decode(ErrorBody.self, from: body)
+        return APIError(status: status, message: decoded?.error ?? "Request failed with status \(status)", reasonCode: decoded?.reason_code)
     }
 }
 

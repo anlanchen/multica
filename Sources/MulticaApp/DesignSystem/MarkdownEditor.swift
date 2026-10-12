@@ -11,7 +11,7 @@ struct MentionCandidate: Identifiable, Hashable {
     var avatarURL: String? = nil
 
     var markdown: String {
-        type == "issue" ? "[\(label)](mention://issue/\(id))" : "[@\(label)](mention://\(type)/\(id))"
+        type == "issue" || type == "project" ? "[\(label)](mention://\(type)/\(id))" : "[@\(label)](mention://\(type)/\(id))"
     }
 }
 
