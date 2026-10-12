@@ -32,17 +32,19 @@ struct InboxPage: View {
             }
         }
         .tabTitle(tr("inbox", "page.title"))
-        .onAppear {
-            guard model == nil else { return }
-            let m = InboxPageModel(session: session)
-            m.nav = nav
-            m.toaster = toaster
-            model = m
-        }
+        .onAppear { _ = ensureModel() }
         .task {
-            guard let model else { return }
-            await model.start(urlKey: nav.query("issue") ?? "", urlView: urlView)
+            await ensureModel().start(urlKey: nav.query("issue") ?? "", urlView: urlView)
         }
+    }
+
+    private func ensureModel() -> InboxPageModel {
+        if let model { return model }
+        let m = InboxPageModel(session: session)
+        m.nav = nav
+        m.toaster = toaster
+        model = m
+        return m
     }
 
     private var urlView: InboxView {
@@ -257,7 +259,10 @@ private struct InboxList: View {
                         return
                     }
                 }
-                guard let newValue else { return }
+                guard let newValue else {
+                    nonce += 1
+                    return
+                }
                 if let item = model.visibleItems.first(where: { InboxFiltering.key($0) == newValue }) {
                     model.click(item)
                 } else {

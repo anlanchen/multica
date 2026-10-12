@@ -175,7 +175,6 @@ struct AttachmentPreviewWebView: NSViewRepresentable {
         let view = WKWebView(frame: .zero, configuration: config)
         view.navigationDelegate = context.coordinator
         view.uiDelegate = context.coordinator
-        view.setValue(false, forKey: "drawsBackground")
         view.pageZoom = pageZoom
         view.loadHTMLString(html, baseURL: nil)
         context.coordinator.loaded = (html, reloadToken)

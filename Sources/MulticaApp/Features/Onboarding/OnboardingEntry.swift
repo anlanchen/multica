@@ -75,18 +75,19 @@ struct OnboardingSteps: View {
                 Color.clear
             }
         }
-        .onAppear {
-            guard model == nil else { return }
-            let m = OnboardingFlowModel(mode: mode)
-            m.env = env
-            m.toaster = toaster
-            m.onCancel = onCancel
-            m.onFinished = onFinished
-            model = m
-        }
-        .task {
-            await model?.load()
-        }
+        .onAppear { _ = ensureModel() }
+        .task { await ensureModel().load() }
+    }
+
+    private func ensureModel() -> OnboardingFlowModel {
+        if let model { return model }
+        let m = OnboardingFlowModel(mode: mode)
+        m.env = env
+        m.toaster = toaster
+        m.onCancel = onCancel
+        m.onFinished = onFinished
+        model = m
+        return m
     }
 
     @ViewBuilder private func content(_ model: OnboardingFlowModel) -> some View {

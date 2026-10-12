@@ -133,6 +133,12 @@ final class OnboardingFlowModel {
     func workspaceCreated(_ ws: Workspace) {
         workspace = ws
         advance(from: .workspace)
+        // A daemon that started with no workspace only picks up a new one on
+        // its next sync tick; restart it so this workspace's runtimes register
+        // while the runtime step is on screen (upstream App.tsx).
+        if let env, env.app.workspaces.isEmpty, workspaces.allSatisfy({ $0.id == ws.id }) {
+            Task { await env.restartDaemon() }
+        }
     }
 
     private func complete(_ path: OnboardingCompletionPath, workspaceID: String?) async throws {

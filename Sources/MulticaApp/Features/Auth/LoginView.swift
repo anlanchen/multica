@@ -41,6 +41,8 @@ struct LoginView: View {
             sessionExpired = env.app.authError == LoginSupport.sessionExpiredMessage
             if sessionExpired { env.app.authError = nil }
             LoginSupport.closeIssueWindows()
+            OnboardingWelcomeStore.shared.reset()
+            OnboardingLinkRouter.shared.noAccessSlug = nil
         }
         .task(id: cooldown) {
             guard cooldown > 0 else { return }

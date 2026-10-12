@@ -163,7 +163,9 @@ private struct InboxFilterPopover: View {
             VStack(spacing: 0) {
                 ForEach(actors) { o in
                     InboxFilterCheckRow(
-                        icon: AnyView(AvatarView(name: o.name, url: o.avatarURL, kind: AvatarKind(actorType: o.type), size: 16)),
+                        icon: AnyView(o.type == "system"
+                            ? AnyView(InboxActorAvatar(type: "system", id: "", size: 16))
+                            : AnyView(AvatarView(name: o.name, url: o.avatarURL, kind: AvatarKind(actorType: o.type), size: 16))),
                         title: o.name,
                         count: facets.actors[o.key] ?? 0,
                         checked: filters.actors.contains(o.key)

@@ -249,12 +249,15 @@ final class InboxPageModel {
         // A shared link to a notification this user doesn't have.
         let key = selectedKey
         selectedKey = ""
-        nav?.replace(.issue(key))
+        if nav?.route == .inbox { nav?.replace(.issue(key)) }
     }
 
     // MARK: Selection & view
 
+    /// Only while the tab still shows the inbox: a request finishing after
+    /// the user moved on must not navigate the tab they are on now.
     private func writeURL() {
+        guard nav?.route == .inbox else { return }
         var query: [String: String] = [:]
         if isArchived { query["view"] = InboxView.archivedParam }
         if !selectedKey.isEmpty { query["issue"] = selectedKey }

@@ -1,3 +1,4 @@
+import AppKit
 import MulticaCore
 import SwiftUI
 
@@ -20,7 +21,7 @@ struct InboxRow: View, Equatable {
 
     var body: some View {
         HStack(spacing: 12) {
-            ActorAvatar(type: item.actorType ?? item.recipientType, id: item.actorID ?? item.recipientID, size: 28)
+            InboxActorAvatar(type: item.actorType ?? item.recipientType, id: item.actorID ?? item.recipientID, size: 28)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     if showUnread {
@@ -67,6 +68,24 @@ struct InboxRow: View, Equatable {
         .padding(.vertical, 5)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+    }
+}
+
+/// Actor avatar; system notifications carry the Multica mark.
+struct InboxActorAvatar: View {
+    let type: String
+    let id: String
+    var size: CGFloat = 20
+
+    var body: some View {
+        if type == "system" {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: size, height: size)
+                .help("Multica")
+        } else {
+            ActorAvatar(type: type, id: id, size: size)
+        }
     }
 }
 
