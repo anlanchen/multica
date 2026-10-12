@@ -54,7 +54,8 @@ public struct APIError: Error, Sendable, Equatable, CustomStringConvertible {
         self.status = status
         self.message = message
         self.body = body
-        self.code = code ?? body?["code"]?.stringValue
+        let c = code ?? body?["code"]?.stringValue
+        self.code = c?.isEmpty == true ? nil : c
         self.reasonCode = reasonCode ?? body?["reason_code"]?.stringValue
     }
 
