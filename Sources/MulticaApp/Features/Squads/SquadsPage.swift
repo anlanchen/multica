@@ -30,7 +30,7 @@ struct SquadsPage: View {
     @Environment(ModalCenter.self) private var modals
     @State private var model = SquadsListModel()
     @State private var view = SquadsViewState()
-    @State private var prefsLoaded = false
+    @State private var prefsSlug: String?
 
     private var prefsKey: String { "multica_squads_view:\(session.workspace.slug)" }
 
@@ -56,10 +56,10 @@ struct SquadsPage: View {
                 SquadsTable(model: model, view: $view)
             }
         }
-        .task {
-            if !prefsLoaded {
+        .task(id: session.workspace.slug) {
+            if prefsSlug != session.workspace.slug {
                 view = ProjectsDefaults.load(SquadsViewState.self, key: prefsKey) ?? SquadsViewState()
-                prefsLoaded = true
+                prefsSlug = session.workspace.slug
             }
             recompute()
             await store.loadIfNeeded()
@@ -68,7 +68,7 @@ struct SquadsPage: View {
         .onChange(of: session.directory.revision) { recompute() }
         .onChange(of: view) {
             recompute()
-            if prefsLoaded { ProjectsDefaults.save(view, key: prefsKey) }
+            if prefsSlug == session.workspace.slug { ProjectsDefaults.save(view, key: prefsKey) }
         }
     }
 

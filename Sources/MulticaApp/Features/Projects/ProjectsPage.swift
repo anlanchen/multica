@@ -54,7 +54,7 @@ struct ProjectsPage: View {
     @Environment(ModalCenter.self) private var modals
     @State private var model = ProjectsListModel()
     @State private var view = ProjectsViewState()
-    @State private var prefsLoaded = false
+    @State private var prefsSlug: String?
     @State private var search = ""
 
     private var prefsKey: String { "multica_projects_view:\(session.workspace.slug)" }
@@ -88,10 +88,10 @@ struct ProjectsPage: View {
                 .padding(.bottom, 24)
             }
         }
-        .task {
-            if !prefsLoaded {
+        .task(id: session.workspace.slug) {
+            if prefsSlug != session.workspace.slug {
                 view = ProjectsDefaults.load(ProjectsViewState.self, key: prefsKey) ?? ProjectsViewState()
-                prefsLoaded = true
+                prefsSlug = session.workspace.slug
             }
             model.recompute(store.items, search: search, view: view)
             model.setPins(session.pins.items)
@@ -103,7 +103,7 @@ struct ProjectsPage: View {
         .onChange(of: search) { model.recompute(store.items, search: search, view: view) }
         .onChange(of: view) {
             model.recompute(store.items, search: search, view: view)
-            if prefsLoaded { ProjectsDefaults.save(view, key: prefsKey) }
+            if prefsSlug == session.workspace.slug { ProjectsDefaults.save(view, key: prefsKey) }
         }
         .onChange(of: session.pins.items) { model.setPins(session.pins.items) }
     }
