@@ -17,7 +17,7 @@ struct CodeSettingsTab: View {
 }
 
 struct ChannelsSettingsTab: View {
-    var body: some View { EmptyStateView(icon: "bubble.left.and.bubble.right", title: tr("settings", "page.tabs.channels")) }
+    var body: some View { ConnectionsChannelsTab() }
 }
 
 struct McpSettingsTab: View {
