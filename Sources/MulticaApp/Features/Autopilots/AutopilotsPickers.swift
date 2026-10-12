@@ -334,19 +334,26 @@ struct AutopilotsFlowLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
+        var rows: [[(LayoutSubview, CGSize)]] = [[]]
+        var x: CGFloat = 0
         for s in subviews {
             let size = s.sizeThatFits(.unspecified)
-            if x > bounds.minX && x + size.width > bounds.maxX {
-                x = bounds.minX
-                y += rowHeight + spacing
-                rowHeight = 0
+            if x > 0 && x + size.width > bounds.width {
+                rows.append([])
+                x = 0
             }
-            s.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            rows[rows.count - 1].append((s, size))
             x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
+        }
+        var y = bounds.minY
+        for row in rows {
+            let height = row.map(\.1.height).max() ?? 0
+            var rx = bounds.minX
+            for (s, size) in row {
+                s.place(at: CGPoint(x: rx, y: y + (height - size.height) / 2), proposal: ProposedViewSize(size))
+                rx += size.width + spacing
+            }
+            y += height + spacing
         }
     }
 }

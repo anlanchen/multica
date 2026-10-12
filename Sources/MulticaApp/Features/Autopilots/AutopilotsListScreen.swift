@@ -119,6 +119,7 @@ private struct AutopilotsDerived: Equatable {
     var counts: [ListState.Scope: Int] = [:]
     var scopeRows: [Autopilot] = []
     var rows: [Autopilot] = []
+    var rowIDs: [String] = []
     var options = AutopilotsList.Options()
 }
 
@@ -148,7 +149,13 @@ struct AutopilotsListScreen: View {
             if tab == "wakeups" {
                 AutopilotsWakeupsView()
             } else if let error = store.error, !store.isLoaded {
-                ErrorStateView(message: error) { Task { await store.load() } }
+                VStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.circle").font(.system(size: 26, weight: .light)).foregroundStyle(Theme.destructive)
+                    Text(error).font(Theme.Font.body).multilineTextAlignment(.center)
+                    Button(t("page.retry")) { Task { await store.load() } }.controlSize(.small)
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !store.isLoaded {
                 skeleton
             } else if store.items.isEmpty {
@@ -181,6 +188,7 @@ struct AutopilotsListScreen: View {
         d.counts = AutopilotsList.scopeCounts(all)
         d.scopeRows = AutopilotsList.scopeRows(all, scope: state.scope)
         d.rows = AutopilotsList.visibleRows(d.scopeRows, state: state)
+        d.rowIDs = d.rows.map(\.id)
         d.options = AutopilotsList.options(d.scopeRows)
         if d != derived { derived = d }
         let ids = Set(all.map(\.id))
@@ -363,8 +371,8 @@ struct AutopilotsListScreen: View {
     }
 
     private func listHeader(state: ListState, columns: [ListState.Column]) -> some View {
-        let rowIDs = derived.rows.map(\.id)
-        let selectedCount = rowIDs.filter { selected.contains($0) }.count
+        let rowIDs = derived.rowIDs
+        let selectedCount = selected.isEmpty ? 0 : rowIDs.reduce(0) { $0 + (selected.contains($1) ? 1 : 0) }
         let all = !rowIDs.isEmpty && selectedCount == rowIDs.count
         let some = selectedCount > 0 && !all
         return AutopilotsListHeader(state: state, columns: columns, allSelected: all, someSelected: some,

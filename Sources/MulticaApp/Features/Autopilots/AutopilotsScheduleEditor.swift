@@ -449,7 +449,7 @@ private struct AutopilotsEveryControls: View {
         let window = Schedule.displayWindow(time)
         let endHour = Schedule.timeParts(window.to).hour
         let _ = { if endHour != ends.dragged { ends.anchor = endHour } }()
-        HStack(spacing: 8) {
+        AutopilotsFlowLayout(spacing: 8) {
             HStack(spacing: 4) {
                 Text(t("schedule_editor.every_prefix")).foregroundStyle(.secondary)
                 AutopilotsNumberField(value: time.interval, range: 1...time.unit.maxInterval, width: 34, autoFocus: autoFocus,
@@ -477,7 +477,6 @@ private struct AutopilotsEveryControls: View {
                 .fixedSize()
                 .accessibilityLabel(t("schedule_editor.a11y.interval_unit"))
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 3) {
                 Image(systemName: "clock").font(.system(size: 10)).foregroundStyle(.secondary)
                 AutopilotsClockField(value: window.from, hourOnly: time.unit == .minutes,
@@ -526,7 +525,7 @@ struct AutopilotsClockField: View {
     var body: some View {
         let parts = AutopilotsSchedule.timeParts(value)
         HStack(spacing: 1) {
-            AutopilotsNumberField(value: parts.hour, range: hourMin...23, pad: true, width: 26, autoFocus: autoFocus,
+            AutopilotsNumberField(value: parts.hour, range: min(max(hourMin, 0), 23)...23, pad: true, width: 26, autoFocus: autoFocus,
                                   bordered: false, accessibilityLabel: hourLabel) { h in
                 onChange("\(AutopilotsSchedule.pad2(h)):\(AutopilotsSchedule.pad2(parts.minute))")
             }

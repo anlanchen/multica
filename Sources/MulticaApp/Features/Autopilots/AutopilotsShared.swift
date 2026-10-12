@@ -27,8 +27,6 @@ enum AutopilotsFormat {
         style.locale = locale
         return date.formatted(style)
     }
-
-    static func relative(_ iso: String?) -> String { Formatters.relative(iso) }
 }
 
 /// Section heading of the detail page (uppercase, muted).
@@ -267,23 +265,29 @@ final class AutopilotsDetailModel {
     func load(_ session: WorkspaceSession) async {
         let api = session.api
         let id = self.id
-        async let detailTask = try? api.getAutopilot(id)
+        async let detailTask = Self.fetchDetail(api, id)
         async let runsTask = try? api.listAutopilotRuns(id)
         let (d, r) = await (detailTask, runsTask)
-        if let d, d.autopilot != nil {
-            if d != detail { detail = d }
-            if let a = d.autopilot, session.autopilots.isLoaded { session.autopilots.upsert(a) }
-        } else if detail == nil || d != nil {
+        switch d {
+        case .success(let response):
+            if response != detail { detail = response.autopilot == nil ? nil : response }
+            if let a = response.autopilot, session.autopilots.isLoaded { session.autopilots.upsert(a) }
+        case .failure(let error as APIError) where error.status == 404:
             detail = nil
+        case .failure:
+            break
         }
         isLoading = false
         if let r, r.runs != runs { runs = r.runs }
         runsLoading = false
     }
 
-    func reloadRuns(_ session: WorkspaceSession) async {
-        if let r = try? await session.api.listAutopilotRuns(id), r.runs != runs { runs = r.runs }
-        runsLoading = false
+    private nonisolated static func fetchDetail(_ api: APIClient, _ id: String) async -> Result<GetAutopilotResponse, Error> {
+        do {
+            return .success(try await api.getAutopilot(id))
+        } catch {
+            return .failure(error)
+        }
     }
 
     func apply(_ autopilot: Autopilot, session: WorkspaceSession) {
