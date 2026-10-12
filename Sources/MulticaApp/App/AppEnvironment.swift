@@ -15,6 +15,7 @@ final class AppEnvironment {
     let shortcuts = ShortcutStore()
     let navigator: Navigator
     @ObservationIgnored let keyMonitor = KeyMonitor()
+    @ObservationIgnored let notifications = SystemNotifications()
 
     /// Invitations to other workspaces addressed to the signed-in user.
     private(set) var myInvitations: [Invitation] = []
@@ -131,6 +132,17 @@ final class AppEnvironment {
         myInvitations = await invitations.value ?? []
     }
 
+    /// Opens the inbox on an item from a system notification, in the
+    /// item's own workspace.
+    func openInboxItem(slug: String, itemID: String, issueKey: String) async {
+        if app.session?.workspace.slug != slug, let ws = app.workspaces.first(where: { $0.slug == slug }) {
+            await switchWorkspace(ws)
+        }
+        guard let session = app.session, session.workspace.slug == slug else { return }
+        navigator.push(.inbox, query: ["issue": issueKey])
+        try? await session.api.markInboxRead(id: itemID)
+    }
+
     func reloadInvitations() async {
         myInvitations = (try? await app.api.listMyInvitations()) ?? myInvitations
     }
@@ -219,6 +231,10 @@ final class AppEnvironment {
         keyMonitor.store = shortcuts
         keyMonitor.perform = { [weak self] action in self?.perform(action) ?? false }
         keyMonitor.start()
+        notifications.onOpen = { [weak self] slug, itemID, issueKey in
+            Task { await self?.openInboxItem(slug: slug, itemID: itemID, issueKey: issueKey) }
+        }
+        notifications.activate()
         await app.bootstrap()
         sessionDidChange()
         if app.user != nil { await loadAccountExtras() }

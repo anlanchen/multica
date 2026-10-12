@@ -18,6 +18,9 @@ public final class InboxStore {
 
     public func unread(in workspaceID: String) -> Int { unreadByWorkspace[workspaceID] ?? 0 }
 
+    /// Unread items across every workspace (dock badge).
+    public var totalUnread: Int { unreadByWorkspace.values.reduce(0, +) }
+
     public func setSummary(_ rows: [InboxWorkspaceUnread]) {
         var map: [String: Int] = [:]
         for r in rows { map[r.workspaceID] = r.count }
@@ -30,7 +33,12 @@ public final class InboxStore {
         rebuild()
     }
 
+    /// The most recent `inbox:new` item (drives system notifications), set
+    /// even when the full inbox has not been loaded.
+    public private(set) var lastArrived: InboxItem?
+
     public func insert(_ item: InboxItem) {
+        lastArrived = item
         guard isLoaded else { return }
         raw.removeAll { $0.id == item.id }
         raw.append(item)

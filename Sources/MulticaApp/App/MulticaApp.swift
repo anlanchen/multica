@@ -129,6 +129,14 @@ struct AppShell: View {
         .onChange(of: session.revision("invitation")) {
             Task { await env.reloadInvitations() }
         }
+        .onChange(of: session.inbox.lastArrived?.id) {
+            guard let item = session.inbox.lastArrived else { return }
+            let slug = env.app.workspaces.first { $0.id == item.workspaceID }?.slug
+            env.notifications.announce(item, slug: slug, api: session.api)
+        }
+        .onChange(of: session.inbox.totalUnread, initial: true) {
+            env.notifications.setBadge(session.inbox.totalUnread)
+        }
     }
 }
 
@@ -137,6 +145,9 @@ struct AppCommands: Commands {
     let env: AppEnvironment
 
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Multica") { AboutPanel.show() }
+        }
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") { env.navigator.push(.settings) }
                 .keyboardShortcut(",", modifiers: .command)
@@ -180,5 +191,24 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .sidebar) {
             Button("Toggle Sidebar") { env.shell.toggleSidebar() }
         }
+    }
+}
+
+/// Standard About panel carrying the Multica name, logo and copyright, as
+/// the Multica License (Part I, 1.b) requires of derived user interfaces.
+enum AboutPanel {
+    static let copyright = "Copyright © 2025-2026 Index Labs (Hong Kong) Limited"
+
+    static func show() {
+        let credits = NSMutableAttributedString(
+            string: "Multica — native macOS client.\nBased on Multica (https://github.com/multica-ai/multica), distributed under the Multica License. See LICENSE and NOTICE in the application bundle.",
+            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]
+        )
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "Multica",
+            .credits: credits,
+            NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): copyright,
+        ])
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
