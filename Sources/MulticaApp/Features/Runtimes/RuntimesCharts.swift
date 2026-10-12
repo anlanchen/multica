@@ -318,43 +318,9 @@ struct RuntimesActivityHeatmap: View {
         let step = Self.cell + Self.gap
         VStack(spacing: 16) {
             VStack(spacing: 8) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ZStack(alignment: .topLeading) {
-                            ForEach(heatmap.months, id: \.date) { m in
-                                Text(Self.monthLabel(m.date)).font(.system(size: 9)).foregroundStyle(.secondary)
-                                    .offset(x: 28 + CGFloat(m.week) * step)
-                            }
-                        }
-                        .frame(width: 28 + CGFloat(RuntimesHeatmap.weeks) * step, height: 14, alignment: .topLeading)
-                        HStack(alignment: .top, spacing: 0) {
-                            VStack(alignment: .leading, spacing: Self.gap) {
-                                ForEach(0..<7, id: \.self) { i in
-                                    Text([0, 2, 4].contains(i) ? weekdays[i] : "")
-                                        .font(.system(size: 9)).foregroundStyle(.secondary)
-                                        .frame(width: 28, height: Self.cell, alignment: .leading)
-                                }
-                            }
-                            HStack(alignment: .top, spacing: Self.gap) {
-                                ForEach(0..<RuntimesHeatmap.weeks, id: \.self) { week in
-                                    VStack(spacing: Self.gap) {
-                                        ForEach(0..<7, id: \.self) { day in
-                                            let index = week * 7 + day
-                                            if index < heatmap.cells.count {
-                                                let c = heatmap.cells[index]
-                                                RoundedRectangle(cornerRadius: 3)
-                                                    .fill(Self.color(c.level))
-                                                    .frame(width: Self.cell, height: Self.cell)
-                                                    .help("\(c.date): " + (c.cost > 0 ? RuntimesFormat.usd2(c.cost) : tr("runtimes", "charts.heatmap_no_activity")))
-                                            } else {
-                                                Color.clear.frame(width: Self.cell, height: Self.cell)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                ViewThatFits(in: .horizontal) {
+                    grid(weekdays: weekdays, step: step)
+                    ScrollView(.horizontal, showsIndicators: false) { grid(weekdays: weekdays, step: step) }
                 }
                 .frame(maxWidth: .infinity)
                 HStack(spacing: 4) {
@@ -377,6 +343,45 @@ struct RuntimesActivityHeatmap: View {
                 insight(tr("runtimes", "charts.heatmap_quietest_weekday"), i.quietWeekday.map { weekdays[$0] } ?? "—",
                         i.quietWeekday == nil ? nil : tr("runtimes", "charts.heatmap_average", ["value": RuntimesFormat.usd(i.quietWeekdayAverage)]))
                 insight(tr("runtimes", "charts.heatmap_window_total", ["count": i.windowDays]), RuntimesFormat.usd(i.totalCost), nil)
+            }
+        }
+    }
+
+    private func grid(weekdays: [String], step: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                ForEach(heatmap.months, id: \.date) { m in
+                    Text(Self.monthLabel(m.date)).font(.system(size: 9)).foregroundStyle(.secondary)
+                        .offset(x: 28 + CGFloat(m.week) * step)
+                }
+            }
+            .frame(width: 28 + CGFloat(RuntimesHeatmap.weeks) * step, height: 14, alignment: .topLeading)
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: Self.gap) {
+                    ForEach(0..<7, id: \.self) { i in
+                        Text([0, 2, 4].contains(i) ? weekdays[i] : "")
+                            .font(.system(size: 9)).foregroundStyle(.secondary)
+                            .frame(width: 28, height: Self.cell, alignment: .leading)
+                    }
+                }
+                HStack(alignment: .top, spacing: Self.gap) {
+                    ForEach(0..<RuntimesHeatmap.weeks, id: \.self) { week in
+                        VStack(spacing: Self.gap) {
+                            ForEach(0..<7, id: \.self) { day in
+                                let index = week * 7 + day
+                                if index < heatmap.cells.count {
+                                    let c = heatmap.cells[index]
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Self.color(c.level))
+                                        .frame(width: Self.cell, height: Self.cell)
+                                        .help("\(c.date): " + (c.cost > 0 ? RuntimesFormat.usd2(c.cost) : tr("runtimes", "charts.heatmap_no_activity")))
+                                } else {
+                                    Color.clear.frame(width: Self.cell, height: Self.cell)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

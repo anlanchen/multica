@@ -294,7 +294,7 @@ private struct RuntimesCostByBlock: View {
                     let maxCost = rows.map(\.cost).max() ?? 0
                     VStack(spacing: 8) {
                         ForEach(rows) { row in
-                            HStack(spacing: 12) {
+                            RuntimesCostRowLayout {
                                 Group {
                                     if tab == .agent {
                                         HStack(spacing: 8) {
@@ -305,18 +305,14 @@ private struct RuntimesCostByBlock: View {
                                         Text(row.key).font(.system(size: 11, design: .monospaced)).lineLimit(1)
                                     }
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                GeometryReader { g in
-                                    ZStack(alignment: .leading) {
-                                        Capsule().fill(RuntimesPalette.muted)
-                                        Capsule().fill(RuntimesPalette.chart1).frame(width: maxCost > 0 ? g.size.width * row.cost / maxCost : 0)
+                                Capsule().fill(RuntimesPalette.muted).frame(height: 8)
+                                    .overlay(alignment: .leading) {
+                                        GeometryReader { g in
+                                            Capsule().fill(RuntimesPalette.chart1).frame(width: maxCost > 0 ? g.size.width * row.cost / maxCost : 0)
+                                        }
                                     }
-                                }
-                                .frame(height: 8)
-                                .frame(maxWidth: .infinity)
-                                .layoutPriority(1)
-                                Text(RuntimesFormat.tokens(row.tokens)).font(Theme.Font.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 80, alignment: .trailing)
-                                Text(RuntimesFormat.usd2(row.cost)).font(Theme.Font.bodyMedium.monospacedDigit()).frame(width: 80, alignment: .trailing)
+                                Text(RuntimesFormat.tokens(row.tokens)).font(Theme.Font.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                Text(RuntimesFormat.usd2(row.cost)).font(Theme.Font.bodyMedium.monospacedDigit())
                             }
                             .padding(.vertical, 4)
                         }
@@ -328,6 +324,28 @@ private struct RuntimesCostByBlock: View {
         .task(id: "\(tab.rawValue)|\(days)") { if tab == .agent { await query.load() } }
         .task(id: RuntimesByAgentKey(rows: query.value, pricings: pricing.pricings)) {
             byAgent = RuntimesUsageMath.costByAgent(query.value ?? [], pricer: pricing.pricer)
+        }
+    }
+}
+
+/// `minmax(0,1fr) minmax(0,2fr) 5rem 5rem` with a 12pt gap.
+private struct RuntimesCostRowLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 600
+        return CGSize(width: width, height: subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 4 else { return }
+        let gap: CGFloat = 12, fixed: CGFloat = 80
+        let flexible = max(0, bounds.width - fixed * 2 - gap * 3)
+        let widths = [flexible / 3, flexible * 2 / 3, fixed, fixed]
+        var x = bounds.minX
+        for (i, sub) in subviews.enumerated() {
+            let anchor: UnitPoint = i >= 2 ? .trailing : .leading
+            let px = i >= 2 ? x + widths[i] : x
+            sub.place(at: CGPoint(x: px, y: bounds.midY), anchor: anchor, proposal: ProposedViewSize(width: widths[i], height: nil))
+            x += widths[i] + gap
         }
     }
 }

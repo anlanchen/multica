@@ -100,15 +100,18 @@ struct RuntimesProfilesDialog: View {
                     .keyboardShortcut(.cancelAction)
                     .help(tr("runtimes", "profiles.close"))
             }
-            HStack(spacing: 4) {
-                Text(description)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(description).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Link(destination: RuntimesDocs.customRuntimes()) {
-                    Label(tr("runtimes", "profiles.learn_more"), systemImage: "arrow.up.right.square").labelStyle(.titleAndIcon)
+                    HStack(spacing: 4) {
+                        Text(tr("runtimes", "profiles.learn_more")).underline()
+                        Image(systemName: "arrow.up.right.square").font(.system(size: 10))
+                    }
                 }
                 .fontWeight(.medium)
+                .foregroundStyle(.primary)
             }
             .font(Theme.Font.caption)
-            .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)

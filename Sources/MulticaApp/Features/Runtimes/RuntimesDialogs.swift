@@ -240,39 +240,44 @@ private struct RuntimesAgentPlanTable: View {
             .foregroundStyle(.secondary)
             .background(Color.primary.opacity(0.04))
             Divider()
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(agents) { agent in
-                        let owner = agent.ownerId.flatMap { id in session.memberRecords.items.first { $0.userId == id } }
-                        row(header: false) {
-                            HStack(spacing: 8) {
-                                ActorAvatar(type: "agent", id: agent.id, size: 18)
-                                Text(agent.name).fontWeight(.medium).lineLimit(1)
-                            }
-                            HStack(spacing: 6) {
-                                if let owner { ActorAvatar(type: "member", id: owner.userId, size: 18) }
-                                Text(owner.map { $0.userId == session.currentUser.id ? tr("runtimes", "detail.delete_dialog.cascade.table.owner_self") : $0.name }
-                                     ?? tr("runtimes", "detail.delete_dialog.cascade.table.owner_unassigned"))
-                                    .foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            RuntimesPlanPresence(presence: RuntimesPresence(runtime: runtime, tasks: tasks.filter { $0.agentID == agent.id }))
-                            if agent.visibility == "public" || agent.visibility == "workspace" {
-                                Label(tr("runtimes", "detail.delete_dialog.cascade.table.visibility_workspace"), systemImage: "globe").foregroundStyle(.secondary)
-                            } else {
-                                Label(tr("runtimes", "detail.delete_dialog.cascade.table.visibility_private"), systemImage: "lock").foregroundStyle(.secondary)
-                            }
-                            Text(agent.model.isEmpty ? tr("runtimes", "detail.delete_dialog.cascade.table.model_unset") : agent.model)
-                                .foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        Divider()
-                    }
-                }
+            if agents.count > 6 {
+                ScrollView { planRows(tasks) }.frame(height: 240)
+            } else {
+                planRows(tasks)
             }
-            .frame(maxHeight: 240)
         }
         .font(Theme.Font.caption)
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func planRows(_ tasks: [AgentTask]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(agents) { agent in
+                let owner = agent.ownerId.flatMap { id in session.memberRecords.items.first { $0.userId == id } }
+                row(header: false) {
+                    HStack(spacing: 8) {
+                        ActorAvatar(type: "agent", id: agent.id, size: 18)
+                        Text(agent.name).fontWeight(.medium).lineLimit(1)
+                    }
+                    HStack(spacing: 6) {
+                        if let owner { ActorAvatar(type: "member", id: owner.userId, size: 18) }
+                        Text(owner.map { $0.userId == session.currentUser.id ? tr("runtimes", "detail.delete_dialog.cascade.table.owner_self") : $0.name }
+                             ?? tr("runtimes", "detail.delete_dialog.cascade.table.owner_unassigned"))
+                            .foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    RuntimesPlanPresence(presence: RuntimesPresence(runtime: runtime, tasks: tasks.filter { $0.agentID == agent.id }))
+                    if agent.visibility == "public" || agent.visibility == "workspace" {
+                        Label(tr("runtimes", "detail.delete_dialog.cascade.table.visibility_workspace"), systemImage: "globe").foregroundStyle(.secondary)
+                    } else {
+                        Label(tr("runtimes", "detail.delete_dialog.cascade.table.visibility_private"), systemImage: "lock").foregroundStyle(.secondary)
+                    }
+                    Text(agent.model.isEmpty ? tr("runtimes", "detail.delete_dialog.cascade.table.model_unset") : agent.model)
+                        .foregroundStyle(.secondary).lineLimit(1)
+                }
+                if agent.id != agents.last?.id { Divider() }
+            }
+        }
     }
 
     private func row<C: View>(header: Bool, @ViewBuilder _ cells: () -> C) -> some View {

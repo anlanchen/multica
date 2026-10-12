@@ -183,6 +183,8 @@ final class RuntimesDaemonLogModel {
 struct DaemonLogView: View {
     @Environment(AppEnvironment.self) private var env
     var onClose: (() -> Void)? = nil
+    /// Defaults to the app daemon profile's `daemon.log`.
+    var logURL: URL? = nil
     @State private var model = RuntimesDaemonLogModel()
     @State private var autoScroll = true
     @State private var expandedFields: Set<Int> = []
@@ -227,7 +229,7 @@ struct DaemonLogView: View {
             .background(Color.primary.opacity(0.03))
         }
         .onAppear {
-            if let url = env.daemon?.profile.logURL { model.start(url: url) }
+            if let url = logURL ?? env.daemon?.profile.logURL { model.start(url: url) }
         }
         .onDisappear { model.stop() }
     }

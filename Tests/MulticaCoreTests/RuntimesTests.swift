@@ -434,6 +434,45 @@ final class RuntimesTests: XCTestCase {
         XCTAssertEqual(RuntimesDaemonLog.truncate(String(repeating: "a", count: 37)), String(repeating: "a", count: 37))
     }
 
+    // MARK: Store helpers
+
+    func testConflictParsing() {
+        let body = Data(#"{"code":"runtime_has_active_agents","error":"busy","active_agents":[{"id":"a1","name":"Atlas","runtime_id":"r"},{"bogus":1}]}"#.utf8)
+        let conflict = RuntimesConflict.runtimeDelete(APIError(status: 409, message: "busy", body: body))
+        XCTAssertEqual(conflict?.code, .hasActiveAgents)
+        XCTAssertEqual(conflict?.agents.map(\.id), ["a1"])
+        XCTAssertNil(RuntimesConflict.runtimeDelete(APIError(status: 409, message: "x", body: Data(#"{"code":"other"}"#.utf8))))
+        XCTAssertNil(RuntimesConflict.runtimeDelete(APIError(status: 500, message: "x", body: body)))
+        let planChanged = RuntimesConflict.runtimeDelete(APIError(status: 409, message: "x", body: Data(#"{"code":"runtime_delete_plan_changed"}"#.utf8)))
+        XCTAssertEqual(planChanged?.code, .planChanged)
+        XCTAssertEqual(planChanged?.agents.count, 0)
+
+        XCTAssertEqual(RuntimesConflict.profileBound(APIError(status: 409, message: "fallback", body: Data(#"{"message":"agents bound"}"#.utf8))), "agents bound")
+        XCTAssertEqual(RuntimesConflict.profileBound(APIError(status: 409, message: "fallback", body: Data(#"{"error":"still used"}"#.utf8))), "still used")
+        XCTAssertEqual(RuntimesConflict.profileBound(APIError(status: 409, message: "fallback")), "fallback")
+        XCTAssertNil(RuntimesConflict.profileBound(APIError(status: 400, message: "x")))
+    }
+
+    func testReleaseVersions() {
+        XCTAssertEqual(RuntimesRelease.parseReleaseVersion("v0.4.17"), [0, 4, 17])
+        XCTAssertNil(RuntimesRelease.parseReleaseVersion("v0.4.17-12-gabc1234"))
+        XCTAssertNil(RuntimesRelease.parseReleaseVersion("dev"))
+        XCTAssertTrue(RuntimesRelease.isNewer("v0.4.18", than: "0.4.17"))
+        XCTAssertFalse(RuntimesRelease.isNewer("v0.4.17", than: "0.4.17"))
+        XCTAssertFalse(RuntimesRelease.isNewer("v0.5.0", than: "dev"))
+        XCTAssertFalse(RuntimesRelease.isNewer("v0.3.9", than: "0.4.0"))
+    }
+
+    func testMikaSetup() {
+        XCTAssertTrue(RuntimesKit.memberNeedsMikaSetup(agents: [AgentRecord(id: "a")], sessions: []))
+        let mika = AgentRecord(id: "m", systemKey: "mika")
+        XCTAssertTrue(RuntimesKit.memberNeedsMikaSetup(agents: [mika], sessions: []))
+        XCTAssertTrue(RuntimesKit.memberNeedsMikaSetup(agents: [mika], sessions: [ChatSession(id: "s", agentId: "m")]))
+        XCTAssertFalse(RuntimesKit.memberNeedsMikaSetup(agents: [mika], sessions: [ChatSession(id: "s", agentId: "m", lastMessage: ChatLastMessage())]))
+        XCTAssertEqual(RuntimesKit.mikaContentLanguage("zh-Hans"), "zh")
+        XCTAssertEqual(RuntimesKit.mikaContentLanguage("fr"), "en")
+    }
+
     // MARK: Daemon rules
 
     func testRecoveryPolicy() {
