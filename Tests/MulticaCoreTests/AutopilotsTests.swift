@@ -1128,3 +1128,176 @@ final class AutopilotsLogicTests: XCTestCase {
         XCTAssertEqual(AutopilotsRuns.taskStatus(for: "running"), .running)
     }
 }
+
+// MARK: - Wakeup draft (upstream wakeup-draft.test.ts)
+
+final class AutopilotsWakeupDraftTests: XCTestCase {
+    private var calendar: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        return c
+    }
+
+    private func date(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 0, _ min: Int = 0, _ s: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min, second: s))!
+    }
+
+    private var now: Date { date(2026, 9, 24, 15) }
+
+    private func draft(_ patch: (inout AutopilotsWakeupDraft) -> Void) -> AutopilotsWakeupDraft {
+        var d = AutopilotsWakeupDraft(agentID: "agent", timezone: "Asia/Shanghai", now: now, calendar: calendar)
+        d.instruction = "Check the result"
+        patch(&d)
+        return d
+    }
+
+    private func build(_ d: AutopilotsWakeupDraft, propertyType: String? = nil) -> Result<IssueWakeupInput, AutopilotsWakeupDraft.DraftError> {
+        d.buildInput(now: now, propertyType: propertyType, calendar: calendar)
+    }
+
+    private func input(_ d: AutopilotsWakeupDraft, propertyType: String? = nil, file: StaticString = #filePath, line: UInt = #line) -> IssueWakeupInput? {
+        switch build(d, propertyType: propertyType) {
+        case .success(let i): return i
+        case .failure(let e):
+            XCTFail("unexpected \(e)", file: file, line: line)
+            return nil
+        }
+    }
+
+    private func error(_ d: AutopilotsWakeupDraft) -> AutopilotsWakeupDraft.DraftError? {
+        if case .failure(let e) = build(d) { return e }
+        return nil
+    }
+
+    private func iso(_ d: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: d)
+    }
+
+    func testRequiresConditionAgentAndInstruction() {
+        XCTAssertEqual(error(draft { _ in }), .missingCondition)
+        XCTAssertEqual(error(draft { $0.condition = .at; $0.agentID = "" }), .missingAgent)
+        XCTAssertEqual(error(draft { $0.condition = .at; $0.instruction = "  " }), .instructionInvalid)
+        XCTAssertEqual(error(draft { $0.condition = .at; $0.instruction = String(repeating: "字", count: 4001) }), .instructionInvalid)
+    }
+
+    func testSingleTime() {
+        let i = input(draft { $0.condition = .at; $0.atPreset = .tenMinutes })
+        XCTAssertEqual(i?.kind, "at")
+        XCTAssertEqual(i?.mode, "once")
+        XCTAssertEqual(i?.at, iso(date(2026, 9, 24, 15, 10)))
+        XCTAssertEqual(i?.agentId, "agent")
+        XCTAssertEqual(input(draft { $0.condition = .at; $0.atPreset = .tomorrow })?.at, iso(date(2026, 9, 25, 9)))
+        XCTAssertEqual(error(draft { $0.condition = .at; $0.atPreset = .custom; $0.atCustom = date(2026, 9, 24, 14) }), .futureTime)
+        XCTAssertEqual(error(draft { $0.condition = .at; $0.atPreset = .custom; $0.atCustom = nil }), .futureTime)
+    }
+
+    func testRecurring() {
+        let daily = input(draft { $0.condition = .recurring; $0.recurrence = .daily; $0.until = date(2026, 9, 30) })
+        XCTAssertEqual(daily?.kind, "cron")
+        XCTAssertEqual(daily?.cronExpression, "0 9 * * *")
+        XCTAssertEqual(daily?.timezone, "Asia/Shanghai")
+        XCTAssertEqual(daily?.mode, "continuous")
+        XCTAssertEqual(daily?.expiresAt, iso(date(2026, 9, 30, 23, 59, 59)))
+        let hourly = input(draft { $0.condition = .recurring; $0.recurrence = .hourly; $0.until = date(2026, 9, 30) })
+        XCTAssertEqual(hourly?.kind, "every")
+        XCTAssertEqual(hourly?.intervalSeconds, 3600)
+        XCTAssertEqual(input(draft { $0.condition = .recurring; $0.recurrence = .weekdays; $0.until = date(2026, 9, 30) })?.cronExpression, "0 9 * * 1-5")
+        XCTAssertEqual(error(draft { $0.condition = .recurring; $0.until = date(2026, 9, 23) }), .untilFuture)
+    }
+
+    func testReplyAndRunEnd() {
+        let reply = input(draft { $0.condition = .reply; $0.replyActor = .init(type: "member", id: "user"); $0.waitDays = 3 })
+        XCTAssertEqual(reply?.kind, "event")
+        XCTAssertEqual(reply?.mode, "once")
+        XCTAssertEqual(reply?.expiresInSeconds, 259_200)
+        XCTAssertEqual(reply?.onTimeout, "wake")
+        XCTAssertEqual(reply?.eventTypes, ["comment.created"])
+        XCTAssertEqual(reply?.filterActorType, "member")
+        XCTAssertEqual(reply?.filterActorId, "user")
+        let anyone = input(draft { $0.condition = .reply; $0.mode = "continuous"; $0.onTimeout = "end" })
+        XCTAssertEqual(anyone?.mode, "continuous")
+        XCTAssertEqual(anyone?.onTimeout, "end")
+        XCTAssertNil(anyone?.filterActorType)
+        let run = input(draft { $0.condition = .runEnd; $0.runAgentID = "emacs" })
+        XCTAssertEqual(run?.eventTypes, ["task.completed", "task.failed", "task.cancelled"])
+        XCTAssertEqual(run?.filterAgentId, "emacs")
+        XCTAssertEqual(error(draft { $0.condition = .custom }), .missingEvents)
+        XCTAssertEqual(input(draft { $0.condition = .custom; $0.events = ["issue.labels_changed"] })?.eventTypes, ["issue.labels_changed"])
+    }
+
+    func testPlatformConditions() {
+        let status = input(draft { $0.condition = .field; $0.field = .status; $0.fieldTarget = "in_review" })
+        XCTAssertEqual(status?.condition, ["type": "issue_field", "field": "status", "value": "in_review"])
+        XCTAssertEqual(status?.expiresInSeconds, 604_800)
+        XCTAssertEqual(input(draft { $0.condition = .field; $0.field = .assignee; $0.assignee = .init(type: "squad", id: "sq") })?.condition,
+                       ["type": "issue_field", "field": "assignee", "assignee_type": "squad", "assignee_id": "sq"])
+        XCTAssertEqual(input(draft { $0.condition = .field; $0.field = .label; $0.fieldTarget = "lbl" })?.condition,
+                       ["type": "issue_field", "field": "label", "label_id": "lbl"])
+        XCTAssertEqual(input(draft { $0.condition = .children; $0.stage = 2 })?.condition, ["type": "children_done", "stage": 2])
+        let children = input(draft { $0.condition = .children; $0.stage = nil })
+        XCTAssertEqual(children?.condition, ["type": "children_done"])
+        XCTAssertNil(children?.eventTypes)
+        XCTAssertEqual(input(draft { $0.condition = .pullRequest; $0.prEvent = "merged" })?.condition, ["type": "pull_request", "event": "merged"])
+        XCTAssertEqual(input(draft { $0.condition = .otherIssue; $0.otherIssueID = "i2"; $0.otherIssueIdentifier = "MUL-2"; $0.otherState = "ended" })?.condition,
+                       ["type": "other_issue", "issue_id": "i2", "state": "ended"])
+    }
+
+    func testPropertyValues() {
+        func value(_ raw: String, _ type: String) -> JSONValue? {
+            input(draft { $0.condition = .field; $0.field = .property; $0.fieldTarget = "p"; $0.fieldValue = raw }, propertyType: type)?.condition?["value"]
+        }
+        XCTAssertEqual(value("opt-1", "select"), "opt-1")
+        XCTAssertEqual(value("false", "checkbox"), false)
+        XCTAssertEqual(value("3", "number"), 3)
+        XCTAssertEqual(value("3a", "number"), "3a")
+    }
+
+    func testMissingValues() {
+        XCTAssertEqual(error(draft { $0.condition = .field; $0.field = .status }), .missingValue)
+        XCTAssertEqual(error(draft { $0.condition = .field; $0.field = .assignee }), .missingValue)
+        XCTAssertEqual(error(draft { $0.condition = .field; $0.field = .property; $0.fieldTarget = "p"; $0.fieldValue = "  " }), .missingValue)
+        XCTAssertEqual(error(draft { $0.condition = .otherIssue }), .missingIssue)
+    }
+
+    func testMaxFires() {
+        XCTAssertEqual(input(draft { $0.condition = .reply; $0.mode = "continuous"; $0.maxFires = 10 })?.maxFires, 10)
+        XCTAssertNil(input(draft { $0.condition = .reply })?.maxFires)
+    }
+
+    func testWakesAssigneeOnComments() {
+        let reply = draft { $0.condition = .reply; $0.agentID = "agent" }
+        XCTAssertTrue(reply.wakesAssigneeOnComments(assigneeAgentID: "agent"))
+        var member = reply
+        member.replyActor = .init(type: "member", id: "u")
+        XCTAssertTrue(member.wakesAssigneeOnComments(assigneeAgentID: "agent"))
+        var agent = reply
+        agent.replyActor = .init(type: "agent", id: "a")
+        XCTAssertFalse(agent.wakesAssigneeOnComments(assigneeAgentID: "agent"))
+        XCTAssertTrue(draft { $0.condition = .custom; $0.events = ["comment.created"] }.wakesAssigneeOnComments(assigneeAgentID: "agent"))
+        XCTAssertFalse(draft { $0.condition = .custom; $0.events = ["issue.status_changed"] }.wakesAssigneeOnComments(assigneeAgentID: "agent"))
+        XCTAssertFalse(reply.wakesAssigneeOnComments(assigneeAgentID: "someone-else"))
+        XCTAssertFalse(reply.wakesAssigneeOnComments(assigneeAgentID: nil))
+    }
+
+    func testRuleStateAndControl() {
+        var w = WorkspaceWakeup(id: "w", kind: "event", mode: "once", enabled: true)
+        XCTAssertEqual(AutopilotsWakeupState.state(w), "waiting")
+        XCTAssertEqual(AutopilotsWakeupState.control(w).control, .toggle)
+        XCTAssertEqual(AutopilotsWakeupState.state(w, closed: true), "issue_closed")
+        w.enabled = false
+        w.pausedReason = "loop"
+        XCTAssertEqual(AutopilotsWakeupState.state(w), "paused")
+        w.pausedReason = nil
+        w.lastTaskId = "t"
+        XCTAssertEqual(AutopilotsWakeupState.state(w), "triggered")
+        XCTAssertEqual(AutopilotsWakeupState.control(w).control, .resubscribe)
+        w.kind = "at"
+        XCTAssertEqual(AutopilotsWakeupState.control(w).control, .reschedule)
+        w.lastTaskStatus = "queued"
+        XCTAssertEqual(AutopilotsWakeupState.control(w).control, .withdraw)
+        XCTAssertTrue(AutopilotsWakeupState.isActiveRun("waiting_local_directory"))
+        XCTAssertFalse(AutopilotsWakeupState.isActiveRun("completed"))
+    }
+}
