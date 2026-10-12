@@ -428,7 +428,7 @@ final class IssueListSurfaceModel {
             Task { await reload() }
             if queryChanged { refreshWorkingAgents() }
         }
-        if old.cardProperties.childProgress != state.cardProperties.childProgress { loadChildProgress() }
+        if old.cardProperties.childProgress != state.cardProperties.childProgress { loadChildProgress(force: true) }
     }
 
     private func scheduleSave() {
@@ -1076,8 +1076,11 @@ final class IssueListSurfaceModel {
         }
     }
 
-    func loadChildProgress() {
+    func loadChildProgress(force: Bool = false) {
         guard state.cardProperties.childProgress || state.tableColumns.contains(where: { $0.key == "child_progress" }) else { return }
+        let now = Date()
+        guard force || now.timeIntervalSince(lastProgressLoad) > 5 else { return }
+        lastProgressLoad = now
         Task {
             guard let list = try? await session.api.getChildIssueProgress() else { return }
             var byParent: [String: (Int, Int)] = [:]
@@ -1090,6 +1093,7 @@ final class IssueListSurfaceModel {
     }
 
     @ObservationIgnored private var childProgressByParent: [String: (Int, Int)] = [:]
+    @ObservationIgnored private var lastProgressLoad = Date.distantPast
 
     func progress(_ id: String) -> (done: Int, total: Int)? {
         childProgressByParent[id].map { (done: $0.0, total: $0.1) }
