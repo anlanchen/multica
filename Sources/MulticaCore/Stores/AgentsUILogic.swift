@@ -442,6 +442,13 @@ extension AgentsUI {
         public var mine = 0
         public var all = 0
         public var archived = 0
+
+        public init(mine: Int = 0, all: Int = 0, archived: Int = 0) {
+            self.mine = mine
+            self.all = all
+            self.archived = archived
+        }
+
         public subscript(scope: ListScope) -> Int {
             switch scope {
             case .mine: return mine
@@ -668,6 +675,22 @@ extension AgentsUI {
             if aUsable != bUsable { return aUsable }
             return x.offset < y.offset
         }.map(\.element)
+    }
+}
+
+// MARK: - Provider capabilities
+
+extension AgentsUI {
+    /// Providers whose backend forwards `agent.mcp_config` to the CLI; the MCP
+    /// tab is hidden for every other provider.
+    public static let mcpSupportedProviders: Set<String> = [
+        "claude", "codebuddy", "codearts", "codex", "cursor", "grok", "hermes", "kimi", "reasonix", "dsh", "kiro",
+        "opencode", "openclaw", "pi", "qoder", "qoderclicn", "qwen", "qwenpaw", "mcode", "traecli", "dim", "omp",
+    ]
+
+    public static func providerSupportsMcp(_ provider: String?) -> Bool {
+        guard let provider else { return false }
+        return mcpSupportedProviders.contains(provider)
     }
 }
 
