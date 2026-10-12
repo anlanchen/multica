@@ -105,9 +105,11 @@ public final class IssueDetailModel: Identifiable {
     /// Inserts or replaces a comment row, ignoring stale revisions (a REST
     /// response can land after a newer WebSocket echo).
     func upsertComment(_ c: Comment) {
-        let row = TimelineEntry(comment: c)
+        var row = TimelineEntry(comment: c)
         if let i = entries.firstIndex(where: { $0.id == c.id }) {
             if let old = entries[i].revision, let new = c.revision, new < old { return }
+            row.actorName = entries[i].actorName
+            row.actorAvatarURL = entries[i].actorAvatarURL
             entries[i] = row
         } else {
             insertSorted(row)

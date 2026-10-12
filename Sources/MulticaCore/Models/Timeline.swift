@@ -41,9 +41,14 @@ public struct Comment: Sendable, Hashable, Identifiable, Decodable {
     public var resolvedAt: String?
     public var deletedAt: String?
     public var sourceTaskID: String?
+    public var attachments: [Attachment]
+    public var resolvedByType: String?
+    public var resolvedByID: String?
+    public var supplements: [CommentSupplementReceipt]
+    public var quickActionID: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, content, type, reactions, revision
+        case id, content, type, reactions, revision, attachments, supplements
         case issueID = "issue_id"
         case authorType = "author_type"
         case authorID = "author_id"
@@ -53,6 +58,9 @@ public struct Comment: Sendable, Hashable, Identifiable, Decodable {
         case resolvedAt = "resolved_at"
         case deletedAt = "deleted_at"
         case sourceTaskID = "source_task_id"
+        case resolvedByType = "resolved_by_type"
+        case resolvedByID = "resolved_by_id"
+        case quickActionID = "quick_action_id"
     }
 
     public init(from decoder: Decoder) throws {
@@ -71,6 +79,11 @@ public struct Comment: Sendable, Hashable, Identifiable, Decodable {
         resolvedAt = c.lossy(String.self, .resolvedAt)
         deletedAt = c.lossy(String.self, .deletedAt)
         sourceTaskID = c.lossy(String.self, .sourceTaskID)
+        attachments = c.lossyArray(Attachment.self, .attachments)
+        resolvedByType = c.lossy(String.self, .resolvedByType)
+        resolvedByID = c.lossy(String.self, .resolvedByID)
+        supplements = c.lossyArray(CommentSupplementReceipt.self, .supplements)
+        quickActionID = c.lossy(String.self, .quickActionID)
     }
 }
 
@@ -100,9 +113,16 @@ public struct TimelineEntry: Sendable, Hashable, Identifiable, Decodable {
     public var resolvedAt: String?
     public var deletedAt: String?
     public var sourceTaskID: String?
+    public var actorAvatarURL: String?
+    public var attachments: [Attachment] = []
+    public var coalescedCount: Int?
+    public var resolvedByType: String?
+    public var resolvedByID: String?
+    public var supplements: [CommentSupplementReceipt] = []
+    public var quickActionID: String?
 
     enum CodingKeys: String, CodingKey {
-        case type, id, action, details, content, reactions, revision
+        case type, id, action, details, content, reactions, revision, attachments, supplements
         case actorType = "actor_type"
         case actorID = "actor_id"
         case actorName = "actor_name"
@@ -113,6 +133,11 @@ public struct TimelineEntry: Sendable, Hashable, Identifiable, Decodable {
         case resolvedAt = "resolved_at"
         case deletedAt = "deleted_at"
         case sourceTaskID = "source_task_id"
+        case actorAvatarURL = "actor_avatar_url"
+        case coalescedCount = "coalesced_count"
+        case resolvedByType = "resolved_by_type"
+        case resolvedByID = "resolved_by_id"
+        case quickActionID = "quick_action_id"
     }
 
     public init(from decoder: Decoder) throws {
@@ -134,6 +159,13 @@ public struct TimelineEntry: Sendable, Hashable, Identifiable, Decodable {
         resolvedAt = c.lossy(String.self, .resolvedAt)
         deletedAt = c.lossy(String.self, .deletedAt)
         sourceTaskID = c.lossy(String.self, .sourceTaskID)
+        actorAvatarURL = c.lossy(String.self, .actorAvatarURL)
+        attachments = c.lossyArray(Attachment.self, .attachments)
+        coalescedCount = c.lossy(Int.self, .coalescedCount)
+        resolvedByType = c.lossy(String.self, .resolvedByType)
+        resolvedByID = c.lossy(String.self, .resolvedByID)
+        supplements = c.lossyArray(CommentSupplementReceipt.self, .supplements)
+        quickActionID = c.lossy(String.self, .quickActionID)
     }
 
     /// Projects a live comment event into a timeline row.
@@ -152,6 +184,11 @@ public struct TimelineEntry: Sendable, Hashable, Identifiable, Decodable {
         resolvedAt = comment.resolvedAt
         deletedAt = comment.deletedAt
         sourceTaskID = comment.sourceTaskID
+        attachments = comment.attachments
+        resolvedByType = comment.resolvedByType
+        resolvedByID = comment.resolvedByID
+        supplements = comment.supplements
+        quickActionID = comment.quickActionID
     }
 
     public var isDeletedComment: Bool { kind == .comment && deletedAt != nil }
