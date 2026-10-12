@@ -9,34 +9,36 @@ struct ServerSettings: View {
     @State private var saved = false
 
     var body: some View {
-        Form {
-            Section {
-                TextField("API URL", text: $apiURL, prompt: Text("https://api.multica.ai"))
-                TextField("Web app URL", text: $appURL, prompt: Text("https://multica.ai"))
-            } footer: {
-                Text("Self-hosted servers use the API and web URLs of your deployment. Changes apply after relaunch; each server keeps its own sign-in.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            HStack {
-                Button("Use Multica Cloud") {
-                    AppEnvironment.resetServerConfig()
-                    apiURL = ServerConfig.production.apiURL.absoluteString
-                    appURL = ServerConfig.production.appURL.absoluteString
-                    saved = true
+        SettingsSectionView(description: "Self-hosted servers use the API and web URLs of your deployment. Changes apply after relaunch; each server keeps its own sign-in.") {
+            VStack(alignment: .leading, spacing: 12) {
+                SettingsCardView {
+                    SettingsRowView("API URL", size: .text) {
+                        TextField("", text: $apiURL, prompt: Text("https://api.multica.ai")).textFieldStyle(.roundedBorder)
+                    }
+                    SettingsRowView("Web app URL", size: .text) {
+                        TextField("", text: $appURL, prompt: Text("https://multica.ai")).textFieldStyle(.roundedBorder)
+                    }
                 }
-                Spacer()
-                Button("Save") {
-                    guard let api = URL(string: apiURL), let web = URL(string: appURL), api.scheme != nil, web.scheme != nil else { return }
-                    AppEnvironment.saveServerConfig(apiURL: api, appURL: web)
-                    saved = true
+                HStack {
+                    Button("Use Multica Cloud") {
+                        AppEnvironment.resetServerConfig()
+                        apiURL = ServerConfig.production.apiURL.absoluteString
+                        appURL = ServerConfig.production.appURL.absoluteString
+                        saved = true
+                    }
+                    Spacer()
+                    if saved {
+                        Text("Saved. Quit and reopen Multica to connect.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Button("Save") {
+                        guard let api = URL(string: apiURL), let web = URL(string: appURL), api.scheme != nil, web.scheme != nil else { return }
+                        AppEnvironment.saveServerConfig(apiURL: api, appURL: web)
+                        saved = true
+                    }
+                    .keyboardShortcut(.defaultAction)
                 }
-                .keyboardShortcut(.defaultAction)
-            }
-            if saved {
-                Text("Saved. Quit and reopen Multica to connect.").font(.caption).foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
         .onAppear {
             apiURL = env.app.config.apiURL.absoluteString
             appURL = env.app.config.appURL.absoluteString
@@ -51,23 +53,26 @@ struct DiagnosticsView: View {
     @State private var realtime = RealtimeMetrics()
 
     var body: some View {
-        Form {
-            Section("HTTP") {
-                LabeledContent("Requests", value: "\(network.requests)")
-                LabeledContent("Deduplicated (shared in flight)", value: "\(network.deduplicated)")
-                LabeledContent("Received", value: ByteCountFormatter.string(fromByteCount: Int64(network.bytesReceived), countStyle: .binary))
-                LabeledContent("Failures", value: "\(network.failures)")
+        VStack(alignment: .leading, spacing: 32) {
+            SettingsSectionView(title: "HTTP") {
+                SettingsCardView {
+                    value("Requests", "\(network.requests)")
+                    value("Deduplicated (shared in flight)", "\(network.deduplicated)")
+                    value("Received", ByteCountFormatter.string(fromByteCount: Int64(network.bytesReceived), countStyle: .binary))
+                    value("Failures", "\(network.failures)")
+                }
             }
-            Section("Realtime") {
-                LabeledContent("Frames", value: "\(realtime.frames)")
-                LabeledContent("Received", value: ByteCountFormatter.string(fromByteCount: Int64(realtime.bytes), countStyle: .binary))
-                LabeledContent("Task messages kept / dropped", value: "\(realtime.taskMessagesKept) / \(realtime.taskMessagesDropped)")
-                LabeledContent("Batches delivered to UI", value: "\(realtime.batchesEmitted)")
-                LabeledContent("Decode time (total)", value: "\(realtime.decodeTime)")
-                LabeledContent("Reconnects", value: "\(realtime.reconnects)")
+            SettingsSectionView(title: "Realtime") {
+                SettingsCardView {
+                    value("Frames", "\(realtime.frames)")
+                    value("Received", ByteCountFormatter.string(fromByteCount: Int64(realtime.bytes), countStyle: .binary))
+                    value("Task messages kept / dropped", "\(realtime.taskMessagesKept) / \(realtime.taskMessagesDropped)")
+                    value("Batches delivered to UI", "\(realtime.batchesEmitted)")
+                    value("Decode time (total)", "\(realtime.decodeTime)")
+                    value("Reconnects", "\(realtime.reconnects)")
+                }
             }
         }
-        .formStyle(.grouped)
         .task {
             while !Task.isCancelled {
                 network = await env.app.api.metrics
@@ -76,6 +81,12 @@ struct DiagnosticsView: View {
                 }
                 try? await Task.sleep(for: .seconds(1))
             }
+        }
+    }
+
+    private func value(_ label: String, _ value: String) -> some View {
+        SettingsRowView(label) {
+            Text(value).font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary).monospacedDigit()
         }
     }
 }

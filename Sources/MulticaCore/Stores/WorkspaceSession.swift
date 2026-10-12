@@ -326,7 +326,7 @@ public final class WorkspaceSession {
                 await self.labels.refreshIfLoaded()
                 await self.skills.refreshIfLoaded()
             case .workspace:
-                break
+                self.bump("workspace")
             case .other:
                 if let s = try? await self.api.inboxUnreadSummary() { self.inbox.setSummary(s) }
                 if self.inbox.isLoaded, let items = try? await self.api.inbox() { self.inbox.setItems(items) }
