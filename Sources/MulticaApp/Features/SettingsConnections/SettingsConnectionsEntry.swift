@@ -25,5 +25,5 @@ struct McpSettingsTab: View {
 }
 
 struct PluginsSettingsTab: View {
-    var body: some View { EmptyStateView(icon: "square.grid.2x2", title: tr("settings", "page.tabs.plugins")) }
+    var body: some View { ConnectionsPluginsTab() }
 }
