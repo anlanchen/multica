@@ -30,7 +30,7 @@ private enum RuntimesDaemonHooks {
 extension AppEnvironment {
     /// Auto-stop on quit: stop the daemon synchronously while the app
     /// terminates, when the user turned that on.
-    func installDaemonQuitHook(_ controller: DaemonController) {
+    func runtimesInstallDaemonQuitHook(_ controller: DaemonController) {
         guard RuntimesDaemonHooks.quitObserver == nil else { return }
         RuntimesDaemonHooks.quitObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: nil

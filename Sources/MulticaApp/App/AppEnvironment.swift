@@ -273,7 +273,7 @@ final class AppEnvironment {
                 self?.daemonStatus = status
             }
         }
-        installDaemonQuitHook(controller)
+        runtimesInstallDaemonQuitHook(controller)
         Task {
             await controller.bootstrap()
             await controller.startPolling()
