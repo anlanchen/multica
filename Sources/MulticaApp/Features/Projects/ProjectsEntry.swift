@@ -3,14 +3,6 @@ import SwiftUI
 
 // Placeholder entry points for this area; replaced by the full screens.
 
-struct ProjectDetailPage: View {
-    let projectID: String
-
-    var body: some View {
-        EmptyStateView(icon: "hammer", title: "ProjectDetailPage")
-    }
-}
-
 struct CreateProjectSheet: View {
     @Environment(\.dismiss) private var dismiss
 
