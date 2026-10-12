@@ -85,7 +85,7 @@ struct ConnectionsCodeTab: View {
     var body: some View {
         ConnectionsSettingsPage(title: tr("settings", "page.tabs.code"), scope: .workspace) {
             if session.connectionsIsMember && !isManager { ConnectionsReadOnlyNotice() }
-            ConnectionsSection(title: tr("settings", "code.hosting_title")) {
+            ConnectionsSection(title: tr("settings", "code.hosting_title"), anchor: "code-hosting") {
                 ConnectionsCard {
                     githubRow
                     if env.appConfig?.vcsIntegrationAvailable == true {
@@ -119,7 +119,8 @@ struct ConnectionsCodeTab: View {
                     ConnectionsHostStatus(connected: status.0, label: status.1)
                 }
             }
-        }, descriptionView: githubDetail(connected: connected, primary: primary, flags: flags).map { AnyView($0.padding(.leading, 48)) }) {
+        }, descriptionView: githubDetail(connected: connected, primary: primary, flags: flags).map { AnyView($0.padding(.leading, 48)) },
+           anchor: "github") {
             if github.canManage {
                 HStack(spacing: 4) {
                     if !connected {
@@ -181,15 +182,16 @@ struct ConnectionsCodeTab: View {
     private var prSection: some View {
         let flags = self.flags
         let featureDisabled = { (key: String) in !github.canManage || !flags.enabled || workspace.savingKey == key }
-        return ConnectionsSection(title: tr("settings", "code.pr_linking_title")) {
+        return ConnectionsSection(title: tr("settings", "code.pr_linking_title"), anchor: "pr-linking") {
             ConnectionsCard {
-                ConnectionsRow(tr("settings", "github.feature_pr_sidebar_label"), description: tr("settings", "github.feature_pr_sidebar_description")) {
+                ConnectionsRow(tr("settings", "github.feature_pr_sidebar_label"), description: tr("settings", "github.feature_pr_sidebar_description"), anchor: "pr-sidebar") {
                     toggle(flags.prSidebar, key: "github_pr_sidebar_enabled", disabled: featureDisabled("github_pr_sidebar_enabled"))
                 }
                 Divider()
                 ConnectionsRow(tr("settings", "github.feature_auto_link_label"),
                                description: tr("settings", "github.feature_auto_link_description",
-                                               ["example": "\(session.workspace.issuePrefix.isEmpty ? "MUL" : session.workspace.issuePrefix)-123"])) {
+                                               ["example": "\(session.workspace.issuePrefix.isEmpty ? "MUL" : session.workspace.issuePrefix)-123"]),
+                               anchor: "auto-link") {
                     toggle(flags.autoLinkPRs, key: "github_auto_link_prs_enabled", disabled: featureDisabled("github_auto_link_prs_enabled"))
                 }
                 Divider()
@@ -197,7 +199,7 @@ struct ConnectionsCodeTab: View {
                     (Text(tr("settings", "github.feature_co_author_description_prefix")) + Text(" ")
                      + Text("Co-authored-by: multica-agent <github@multica.ai>").font(.system(size: 11, design: .monospaced))
                      + Text(tr("settings", "github.feature_co_author_description_suffix")))
-                        .font(Theme.Font.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true))) {
+                        .font(Theme.Font.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)), anchor: "co-author") {
                     toggle(flags.coAuthor, key: "co_authored_by_enabled", disabled: featureDisabled("co_authored_by_enabled"))
                 }
                 Divider()
@@ -268,7 +270,7 @@ private struct ConnectionsPRMergeStatusRow: View {
         let stored = ConnectionsPRMergeStatus.derive(settings: workspace.settings)
         let offered = groups.contains { $0.keys.contains(stored) }
         let value = offered ? stored : ConnectionsPRMergeStatus.none
-        ConnectionsRow(tr("settings", "pr_merge_status.label"), description: tr("settings", "pr_merge_status.description")) {
+        ConnectionsRow(tr("settings", "pr_merge_status.label"), description: tr("settings", "pr_merge_status.description"), anchor: "pr-merge-status") {
             Menu {
                 Button { persist(ConnectionsPRMergeStatus.none, current: value) } label: {
                     Label(tr("settings", "pr_merge_status.none"), systemImage: "circle.slash")

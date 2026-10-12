@@ -68,7 +68,8 @@ struct ConnectionsVCSRows: View {
                             }
                         }
                     }
-                }, descriptionView: connectDetail.map { AnyView($0.font(Theme.Font.caption).foregroundStyle(.secondary).padding(.leading, 48)) }) {
+                }, descriptionView: connectDetail.map { AnyView($0.font(Theme.Font.caption).foregroundStyle(.secondary).padding(.leading, 48)) },
+                   anchor: "vcs") {
                     if canManage {
                         Button(tr("settings", connections.isEmpty ? "vcs.connect" : "vcs.connect_another")) { connectOpen = true }
                             .controlSize(.small)

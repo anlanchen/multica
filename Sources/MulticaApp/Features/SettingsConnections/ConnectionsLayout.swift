@@ -15,8 +15,41 @@ extension WorkspaceSession {
     var connectionsIsMember: Bool { connectionsRole != nil }
 }
 
+private struct ConnectionsFlashKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    /// The `?section=` anchor currently being flashed after a deep link.
+    var connectionsFlashAnchor: String? {
+        get { self[ConnectionsFlashKey.self] }
+        set { self[ConnectionsFlashKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Marks a deep-link target (`?section=<anchor>`) and flashes it when linked.
+    @ViewBuilder func connectionsAnchor(_ anchor: String?) -> some View {
+        if let anchor { modifier(ConnectionsAnchorModifier(anchor: anchor)) } else { self }
+    }
+}
+
+private struct ConnectionsAnchorModifier: ViewModifier {
+    @Environment(\.connectionsFlashAnchor) private var flash
+    let anchor: String
+
+    func body(content: Content) -> some View {
+        content
+            .background(Theme.selected.opacity(flash == anchor ? 1 : 0))
+            .animation(.easeOut(duration: 0.7), value: flash == anchor)
+            .id(anchor)
+    }
+}
+
 /// A self-contained, scrollable settings tab body.
 struct ConnectionsSettingsPage<Content: View>: View {
+    @Environment(Navigator.self) private var nav
+    @State private var flash: String?
     let title: String
     var description: String? = nil
     var scope: ConnectionsScope? = nil
@@ -26,6 +59,22 @@ struct ConnectionsSettingsPage<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
+        ScrollViewReader { proxy in
+            scroll
+                .task(id: nav.query("section")) {
+                    guard let section = nav.query("section"), !section.isEmpty else { return }
+                    // Tab content may still be loading; give it a moment to lay out.
+                    try? await Task.sleep(for: .milliseconds(250))
+                    withAnimation { proxy.scrollTo(section, anchor: .center) }
+                    flash = section
+                    try? await Task.sleep(for: .milliseconds(1600))
+                    flash = nil
+                }
+        }
+        .environment(\.connectionsFlashAnchor, flash)
+    }
+
+    private var scroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -91,9 +140,14 @@ struct ConnectionsSection<Content: View>: View {
     var title: String? = nil
     var description: String? = nil
     var action: AnyView? = nil
+    var anchor: String? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
+        sectionBody.connectionsAnchor(anchor)
+    }
+
+    private var sectionBody: some View {
         VStack(alignment: .leading, spacing: 12) {
             if title != nil || description != nil || action != nil {
                 HStack(alignment: .bottom, spacing: 16) {
@@ -135,9 +189,14 @@ struct ConnectionsRow<Label: View, Control: View>: View {
     var description: String? = nil
     var descriptionView: AnyView? = nil
     var alignTop = false
+    var anchor: String? = nil
     @ViewBuilder var control: () -> Control
 
     var body: some View {
+        rowBody.connectionsAnchor(anchor)
+    }
+
+    private var rowBody: some View {
         HStack(alignment: alignTop ? .top : .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 3) {
                 label().font(Theme.Font.bodyMedium)
@@ -162,11 +221,12 @@ struct ConnectionsRow<Label: View, Control: View>: View {
 
 extension ConnectionsRow where Label == Text {
     init(_ title: String, description: String? = nil, descriptionView: AnyView? = nil, alignTop: Bool = false,
-         @ViewBuilder control: @escaping () -> Control) {
+         anchor: String? = nil, @ViewBuilder control: @escaping () -> Control) {
         self.label = { Text(title) }
         self.description = description
         self.descriptionView = descriptionView
         self.alignTop = alignTop
+        self.anchor = anchor
         self.control = control
     }
 }

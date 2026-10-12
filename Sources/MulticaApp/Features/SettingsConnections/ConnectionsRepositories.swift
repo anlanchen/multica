@@ -20,7 +20,7 @@ struct ConnectionsRepositoriesSection: View {
 
     var body: some View {
         ConnectionsSection(title: tr("settings", "repositories.section_title"), description: tr("settings", "repositories.description"),
-                           action: canManage ? AnyView(addMenu) : nil) {
+                           action: canManage ? AnyView(addMenu) : nil, anchor: "repositories") {
             ConnectionsCard {
                 if repos.isEmpty {
                     Text(tr("settings", canManage ? "repositories.empty" : "repositories.manage_hint"))
