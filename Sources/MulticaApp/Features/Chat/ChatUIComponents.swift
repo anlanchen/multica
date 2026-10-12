@@ -332,50 +332,54 @@ struct ChatUIEmptyState: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                if let agent {
-                    ChatUIAgentAvatar(agentID: agent.id, size: 48, showDot: false)
+        GeometryReader { g in
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, minHeight: g.size.height)
+            }
+        }
+    }
+
+    private var content: some View {
+        VStack(spacing: 20) {
+            if let agent {
+                ChatUIAgentAvatar(agentID: agent.id, size: 48, showDot: false)
+            }
+            VStack(spacing: 4) {
+                Text(agent.map { tr("chat", "empty_state.chat_with_named", ["name": $0.name]) } ?? tr("chat", "empty_state.first_time_title"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                if let d = agent?.description.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty {
+                    Text(d).font(Theme.Font.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }
-                VStack(spacing: 4) {
-                    Text(agent.map { tr("chat", "empty_state.chat_with_named", ["name": $0.name]) } ?? tr("chat", "empty_state.first_time_title"))
-                        .font(.system(size: 16, weight: .semibold))
-                        .multilineTextAlignment(.center)
-                    if let d = agent?.description.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty {
-                        Text(d).font(Theme.Font.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                if !hasSessions {
+                    Text(tr("chat", "empty_state.first_time_actions")).font(Theme.Font.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: 384)
+            if let agent {
+                VStack(spacing: 8) {
+                    ForEach(Array(ChatUIAgents.starters(agent.conversationStarters, fallback: Self.fallbackStarters).enumerated()), id: \.offset) { _, s in
+                        ChatUIStarterButton(label: s.label) { onPick(s.prompt) }
                     }
-                    if !hasSessions {
-                        Text(tr("chat", "empty_state.first_time_actions")).font(Theme.Font.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    if canCustomize {
+                        Button {
+                            nav.push(.agent(agent.id), query: ["view": "instructions", "focus": "conversation_starters"])
+                        } label: {
+                            Label(tr("chat", "conversation_starters.customize"), systemImage: "slider.horizontal.3")
+                                .font(Theme.Font.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
                     }
                 }
                 .frame(maxWidth: 384)
-                if let agent {
-                    VStack(spacing: 8) {
-                        ForEach(Array(ChatUIAgents.starters(agent.conversationStarters, fallback: Self.fallbackStarters).enumerated()), id: \.offset) { _, s in
-                            ChatUIStarterButton(label: s.label) { onPick(s.prompt) }
-                        }
-                        if canCustomize {
-                            Button {
-                                nav.push(.agent(agent.id), query: ["view": "instructions", "focus": "conversation_starters"])
-                            } label: {
-                                Label(tr("chat", "conversation_starters.customize"), systemImage: "slider.horizontal.3")
-                                    .font(Theme.Font.caption)
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
-                        }
-                    }
-                    .frame(maxWidth: 384)
-                    .accessibilityLabel(tr("chat", "conversation_starters.aria_label"))
-                }
+                .accessibilityLabel(tr("chat", "conversation_starters.aria_label"))
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 32)
-            .frame(maxWidth: .infinity)
         }
-        .defaultScrollAnchor(.center)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 32)
     }
 }
 
