@@ -119,10 +119,13 @@ public final class WorkspaceSession {
         case "invitation":
             bump("invitation")
             Task { await memberRecords.refreshIfLoaded() }
-        case "issue_properties", "issue_metadata", "issue_attachments", "issue_reaction", "subscriber", "reaction":
-            if let issueID = payload["issue_id"]?.stringValue, let d = details[issueID] {
-                Task { await self.reload(d) }
+        case "reaction":
+            if let issueID = payload["issue_id"]?.stringValue {
+                details[issueID]?.applyReactionEvent(added: verb == "added", payload: payload)
             }
+            bump(kind)
+        case "issue_properties", "issue_metadata", "issue_attachments", "issue_reaction", "subscriber":
+            // The open detail refetches only the affected resource on this revision.
             bump(kind)
         case "pull_request", "github_installation":
             bump(kind)
