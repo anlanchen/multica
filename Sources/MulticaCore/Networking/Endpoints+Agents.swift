@@ -144,7 +144,7 @@ extension APIClient {
         if let queuedAction, let sessionId {
             q = MulticaCore.query(["expected_status": "queued", "chat_session_id": sessionId, "queue_action": queuedAction])
         }
-        return try await call(.post, "/api/tasks/\(taskId)/cancel", query: q)
+        return try await call(.post, "/api/tasks/\(taskId)/cancel", query: q, headers: ["X-Client-Capabilities": "chat-draft-restore-v1"])
     }
 
     // MARK: Agent skills, labels and MCP
